@@ -35,7 +35,7 @@ export default function Workers() {
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {workers?.map((worker: any) => (
+            {(workers as any[] || []).map((worker: any) => (
               <WorkerCard key={worker.id} worker={worker} data-testid={`card-worker-${worker.id}`} />
             ))}
           </div>

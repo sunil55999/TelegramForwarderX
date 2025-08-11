@@ -50,10 +50,10 @@ export default function Navbar({ onLogout }: NavbarProps) {
             <div className="bg-gray-100 rounded-full px-3 py-1 flex items-center space-x-2">
               <i className="fas fa-memory text-gray-600"></i>
               <span 
-                className={`text-sm font-medium ${getRamUsageColor(health?.ramUsage || 0)}`}
+                className={`text-sm font-medium ${getRamUsageColor((health as any)?.ramUsage || 0)}`}
                 data-testid="text-ram-usage"
               >
-                RAM: {health?.ramUsage || 0}%
+                RAM: {(health as any)?.ramUsage || 0}%
               </span>
             </div>
             

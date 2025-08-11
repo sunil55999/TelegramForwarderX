@@ -3,17 +3,18 @@ import DashboardLayout from "@/components/layout/sidebar";
 import StatsCard from "@/components/dashboard/stats-card";
 import ActivityFeed from "@/components/dashboard/activity-feed";
 import SystemHealth from "@/components/dashboard/system-health";
+import type { DashboardStats, SystemHealth as SystemHealthData, ActivityItem } from "@shared/schema";
 
 export default function Dashboard() {
-  const { data: stats, isLoading: statsLoading } = useQuery({
+  const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
     queryKey: ["/api/dashboard/stats"],
   });
 
-  const { data: health, isLoading: healthLoading } = useQuery({
+  const { data: health, isLoading: healthLoading } = useQuery<SystemHealthData>({
     queryKey: ["/api/dashboard/health"],
   });
 
-  const { data: activity, isLoading: activityLoading } = useQuery({
+  const { data: activity, isLoading: activityLoading } = useQuery<ActivityItem[]>({
     queryKey: ["/api/dashboard/activity"],
   });
 
@@ -64,7 +65,7 @@ export default function Dashboard() {
               title={card.title}
               value={card.value}
               icon={card.icon}
-              color={card.color}
+              color={card.color as "green" | "blue" | "purple" | "yellow"}
               isLoading={statsLoading}
               data-testid={`card-stat-${index}`}
             />

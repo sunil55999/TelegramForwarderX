@@ -141,6 +141,8 @@ export class MemStorage implements IStorage {
     const user: User = {
       ...insertUser,
       id,
+      userType: insertUser.userType || 'free',
+      isActive: insertUser.isActive ?? true,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -179,6 +181,11 @@ export class MemStorage implements IStorage {
     const session: TelegramSession = {
       ...insertSession,
       id,
+      status: insertSession.status || 'idle',
+      sessionData: insertSession.sessionData || null,
+      workerId: insertSession.workerId || null,
+      messageCount: insertSession.messageCount || 0,
+      lastActivity: insertSession.lastActivity || null,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -213,6 +220,13 @@ export class MemStorage implements IStorage {
     const worker: Worker = {
       ...insertWorker,
       id,
+      status: insertWorker.status || 'offline',
+      cpuUsage: insertWorker.cpuUsage || 0,
+      memoryUsage: insertWorker.memoryUsage || 0,
+      activeSessions: insertWorker.activeSessions || 0,
+      messagesPerHour: insertWorker.messagesPerHour || 0,
+      lastHeartbeat: insertWorker.lastHeartbeat || null,
+      config: insertWorker.config || {},
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -251,6 +265,8 @@ export class MemStorage implements IStorage {
     const rule: ForwardingRule = {
       ...insertRule,
       id,
+      isActive: insertRule.isActive ?? true,
+      filters: insertRule.filters || {},
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -277,6 +293,7 @@ export class MemStorage implements IStorage {
     const log: SystemLog = {
       ...insertLog,
       id,
+      metadata: insertLog.metadata || {},
       createdAt: new Date(),
     };
     this.systemLogs.set(id, log);
@@ -299,7 +316,7 @@ export class MemStorage implements IStorage {
       id: existing?.id || randomUUID(),
       key: insertSetting.key,
       value: insertSetting.value,
-      description: insertSetting.description,
+      description: insertSetting.description || null,
       updatedAt: new Date(),
     };
     this.systemSettings.set(insertSetting.key, setting);

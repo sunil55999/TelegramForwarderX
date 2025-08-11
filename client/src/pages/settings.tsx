@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import DashboardLayout from "@/components/layout/sidebar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,15 +28,15 @@ export default function Settings() {
   });
 
   // Initialize form data when settings load
-  useState(() => {
+  useEffect(() => {
     if (settings) {
       const settingsMap: Record<string, any> = {};
-      settings.forEach((setting: any) => {
+      (settings as any[]).forEach((setting: any) => {
         settingsMap[setting.key] = setting.key === "worker_auto_restart" ? setting.value === "true" : setting.value;
       });
       setFormData(prev => ({ ...prev, ...settingsMap }));
     }
-  });
+  }, [settings]);
 
   const updateSettingMutation = useMutation({
     mutationFn: async ({ key, value, description }: { key: string; value: string; description?: string }) => {

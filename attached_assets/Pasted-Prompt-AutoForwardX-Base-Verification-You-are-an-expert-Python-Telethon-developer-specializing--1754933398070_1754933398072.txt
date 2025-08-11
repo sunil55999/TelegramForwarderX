@@ -1,0 +1,109 @@
+Prompt — AutoForwardX Base Verification
+You are an expert Python & Telethon developer, specializing in building high-performance, multi-user Telegram bots with worker-server architecture.
+I want you to act as a code reviewer & QA tester for the base setup of my project AutoForwardX.
+The goal of this step is to verify that the core skeleton of the application is correct, stable, and scalable before moving forward.
+
+The base should include:
+Core Project Structure
+
+main_server/ — Handles API, dashboard communication, user management.
+
+workers/ — Independent worker scripts that can run on separate VPSs.
+
+shared/ — Common utilities (logging, database models, configs, session manager).
+
+tests/ — Unit and integration tests.
+
+Core Features Implemented in the Base
+
+Flask (or FastAPI) backend ready.
+
+Socket.IO/WebSocket or message queue (Redis/RabbitMQ) communication between main server & workers.
+
+Database (PostgreSQL/MySQL) setup with user, subscription, and session tables.
+
+Telethon session manager (multi-user, persistent storage, idle connection support).
+
+Basic user authentication & dashboard login page.
+
+Placeholder API endpoints for:
+
+Start/Stop forwarding
+
+Add/Remove Telegram accounts
+
+List sessions and status
+
+Worker heartbeat system (so main server knows if worker is online).
+
+Error & crash logging for both main server & workers.
+
+Environment variables via .env (secrets, API keys, DB credentials).
+
+Core Requirements for Verification
+
+Can run main server & at least one worker simultaneously without blocking each other.
+
+Main server detects when worker is down and reports correctly.
+
+Worker can handle at least 5 dummy sessions without RAM spike (>200MB each).
+
+Idle clients remain connected (no disconnect after inactivity).
+
+Proper modular code (no hardcoded values, uses configs).
+
+No critical bugs, warnings, or dependency errors on startup.
+
+Codebase follows PEP8 and is clean.
+
+Verification Steps
+Run Startup Test
+
+Start main server & one worker.
+
+Confirm they connect and main server lists worker as active.
+
+Dummy Session Test
+
+Add 5 dummy Telethon accounts (fake API key, no actual Telegram login).
+
+Ensure they are all stored in DB and remain idle without disconnect.
+
+Communication Test
+
+From dashboard or API, send "ping" to worker and confirm "pong" response within 2s.
+
+Crash Recovery Test
+
+Kill the worker process.
+
+Confirm main server marks worker as offline.
+
+Restart worker and confirm automatic reconnection.
+
+RAM Usage Test
+
+Monitor RAM with htop or psutil.
+
+Ensure memory remains stable during idle state.
+
+Code Quality Test
+
+Run flake8 or black to ensure PEP8 compliance.
+
+Check that configs, secrets, and database credentials are not hardcoded.
+
+Expected Output
+If the base is implemented correctly, you should confirm:
+
+✅ Stable multi-user session manager.
+
+✅ Main–worker communication works with real-time status updates.
+
+✅ RAM stays low with idle clients.
+
+✅ Worker crash recovery is functional.
+
+✅ Clean, modular, and extensible code ready for feature implementation.
+
+If anything fails, you must list the exact issues and suggest fixes before we proceed.

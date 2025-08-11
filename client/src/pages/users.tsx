@@ -160,7 +160,7 @@ export default function Users() {
           </Dialog>
         </div>
 
-        <UserTable users={users || []} isLoading={isLoading} />
+        <UserTable users={users as any[] || []} isLoading={isLoading} />
       </div>
     </DashboardLayout>
   );

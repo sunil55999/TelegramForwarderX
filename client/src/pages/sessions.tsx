@@ -155,7 +155,7 @@ export default function Sessions() {
           </Dialog>
         </div>
 
-        <SessionTable sessions={sessions || []} isLoading={isLoading} />
+        <SessionTable sessions={sessions as any[] || []} isLoading={isLoading} />
       </div>
     </DashboardLayout>
   );
