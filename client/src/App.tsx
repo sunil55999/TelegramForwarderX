@@ -18,6 +18,7 @@ import NotFound from "@/pages/not-found";
 import RegexRules from "@/pages/RegexRules";
 import PendingMessages from "@/pages/PendingMessages";
 import Statistics from "@/pages/Statistics";
+import Phase3Verification from "@/pages/Phase3Verification";
 
 function Router() {
   return (
@@ -36,6 +37,7 @@ function Router() {
       <Route path="/regex-rules" component={RegexRules} />
       <Route path="/pending-messages" component={PendingMessages} />
       <Route path="/statistics" component={Statistics} />
+      <Route path="/phase3-verification" component={Phase3Verification} />
       <Route component={NotFound} />
     </Switch>
   );

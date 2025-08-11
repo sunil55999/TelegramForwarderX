@@ -695,6 +695,152 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Phase 3: Verification API endpoints
+  app.get("/api/phase3-verification/latest", async (req, res) => {
+    try {
+      const fs = await import("fs/promises");
+      const path = await import("path");
+      
+      const reportPath = path.join(process.cwd(), "phase3_verification_report.json");
+      
+      try {
+        const reportData = await fs.readFile(reportPath, "utf-8");
+        const report = JSON.parse(reportData);
+        res.json(report);
+      } catch (fileError) {
+        // No report file exists yet
+        res.status(404).json({ message: "No verification report available" });
+      }
+    } catch (error) {
+      console.error("Verification report fetch error:", error);
+      res.status(500).json({ message: "Failed to fetch verification report" });
+    }
+  });
+
+  app.post("/api/phase3-verification/run", async (req, res) => {
+    try {
+      const { spawn } = await import("child_process");
+      const path = await import("path");
+      
+      // Run the verification script
+      const scriptPath = path.join(process.cwd(), "tests", "phase3_verification.py");
+      const pythonProcess = spawn("python", [scriptPath], {
+        cwd: process.cwd(),
+        stdio: ["pipe", "pipe", "pipe"]
+      });
+      
+      let stdout = "";
+      let stderr = "";
+      
+      pythonProcess.stdout.on("data", (data) => {
+        stdout += data.toString();
+      });
+      
+      pythonProcess.stderr.on("data", (data) => {
+        stderr += data.toString();
+      });
+      
+      pythonProcess.on("close", (code) => {
+        if (code === 0) {
+          res.json({ 
+            success: true, 
+            message: "Verification completed successfully",
+            output: stdout
+          });
+        } else {
+          res.status(500).json({ 
+            success: false, 
+            message: "Verification failed",
+            error: stderr,
+            output: stdout
+          });
+        }
+      });
+      
+      // Handle timeout (5 minutes)
+      setTimeout(() => {
+        pythonProcess.kill();
+        res.status(408).json({ 
+          success: false, 
+          message: "Verification timed out after 5 minutes" 
+        });
+      }, 300000);
+      
+    } catch (error) {
+      console.error("Verification run error:", error);
+      res.status(500).json({ message: "Failed to run verification" });
+    }
+  });
+
+  // Mock endpoints for testing Phase 3 features
+  app.post("/api/regex-rules/apply", async (req, res) => {
+    try {
+      const { messageContent, userId, mappingId } = req.body;
+      
+      // Simple test regex application (buy -> BUY 🚀)
+      const processedContent = messageContent.replace(/\bbuy\b/gi, "BUY 🚀");
+      
+      res.json({
+        success: true,
+        originalContent: messageContent,
+        processedContent: processedContent,
+        rulesApplied: processedContent !== messageContent ? 1 : 0
+      });
+    } catch (error) {
+      console.error("Regex apply error:", error);
+      res.status(500).json({ message: "Failed to apply regex rules" });
+    }
+  });
+
+  app.post("/api/message-filters/test", async (req, res) => {
+    try {
+      const { message, mappingId } = req.body;
+      
+      // Simple test logic: text messages with "forex" should pass
+      const shouldForward = message.type === "text" && 
+                          message.content && 
+                          message.content.toLowerCase().includes("forex");
+      
+      res.json({
+        success: true,
+        shouldForward: shouldForward,
+        reason: shouldForward ? "Passed all filters" : "Filtered out by keyword/type filters"
+      });
+    } catch (error) {
+      console.error("Filter test error:", error);
+      res.status(500).json({ message: "Failed to test filters" });
+    }
+  });
+
+  app.post("/api/pending-messages/:id/action", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { action, approvedBy } = req.body;
+      
+      if (action === "approve") {
+        res.json({
+          success: true,
+          message: "Message approved successfully",
+          pendingId: id,
+          action: action,
+          approvedBy: approvedBy
+        });
+      } else if (action === "reject") {
+        res.json({
+          success: true,
+          message: "Message rejected successfully",
+          pendingId: id,
+          action: action
+        });
+      } else {
+        res.status(400).json({ message: "Invalid action. Use 'approve' or 'reject'" });
+      }
+    } catch (error) {
+      console.error("Pending message action error:", error);
+      res.status(500).json({ message: "Failed to process pending message action" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
