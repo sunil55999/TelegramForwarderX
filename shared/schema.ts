@@ -326,3 +326,219 @@ export type ActivityItem = {
   timestamp: string;
   component: string;
 };
+
+// Phase 3: Advanced Editing Rules
+export const regexEditingRules = pgTable("regex_editing_rules", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  mappingId: varchar("mapping_id").references(() => forwardingMappings.id, { onDelete: "cascade" }),
+  
+  name: text("name").notNull(), // User-friendly name for the rule
+  findPattern: text("find_pattern").notNull(), // Regex pattern to find
+  replaceWith: text("replace_with").notNull(), // Replacement string
+  isGlobal: boolean("is_global").notNull().default(true), // Global flag for regex
+  isCaseSensitive: boolean("is_case_sensitive").notNull().default(false),
+  
+  priority: integer("priority").notNull().default(1), // Execution order (lower = first)
+  isActive: boolean("is_active").notNull().default(true),
+  
+  // Global rule (applies to all mappings for user) or specific to mapping
+  isGlobalRule: boolean("is_global_rule").notNull().default(false),
+  
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+
+// Phase 3: Message Update & Delete Syncing
+export const messageSyncSettings = pgTable("message_sync_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  mappingId: varchar("mapping_id").references(() => forwardingMappings.id, { onDelete: "cascade" }),
+  
+  enableUpdateSync: boolean("enable_update_sync").notNull().default(false),
+  enableDeleteSync: boolean("enable_delete_sync").notNull().default(false),
+  updateSyncDelay: integer("update_sync_delay").notNull().default(0), // Seconds delay
+  
+  // Global setting (applies to all mappings for user) or specific to mapping
+  isGlobalSetting: boolean("is_global_setting").notNull().default(false),
+  
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+
+// Phase 3: Message Tracking for Sync
+export const messageTracker = pgTable("message_tracker", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  mappingId: varchar("mapping_id").notNull().references(() => forwardingMappings.id, { onDelete: "cascade" }),
+  
+  originalMessageId: text("original_message_id").notNull(), // Source message ID
+  originalChatId: text("original_chat_id").notNull(), // Source chat ID
+  forwardedMessageId: text("forwarded_message_id").notNull(), // Destination message ID
+  forwardedChatId: text("forwarded_chat_id").notNull(), // Destination chat ID
+  
+  messageHash: text("message_hash"), // Hash of original content for change detection
+  lastSynced: timestamp("last_synced").notNull().default(sql`now()`),
+  
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+// Phase 3: Message Delay & Approval System
+export const messageDelaySettings = pgTable("message_delay_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  mappingId: varchar("mapping_id").references(() => forwardingMappings.id, { onDelete: "cascade" }),
+  
+  enableDelay: boolean("enable_delay").notNull().default(false),
+  delaySeconds: integer("delay_seconds").notNull().default(10), // 5-60 seconds
+  requireApproval: boolean("require_approval").notNull().default(false),
+  autoApprovalTimeout: integer("auto_approval_timeout").notNull().default(300), // Auto-approve after 5 minutes
+  
+  // Global setting (applies to all mappings for user) or specific to mapping
+  isGlobalSetting: boolean("is_global_setting").notNull().default(false),
+  
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+
+// Phase 3: Pending Messages Queue
+export const pendingMessages = pgTable("pending_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  mappingId: varchar("mapping_id").notNull().references(() => forwardingMappings.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  
+  originalMessageId: text("original_message_id").notNull(),
+  originalChatId: text("original_chat_id").notNull(),
+  messageContent: jsonb("message_content").notNull(), // Serialized message data
+  processedContent: text("processed_content"), // After filters/editing
+  
+  status: text("status").notNull().default("pending"), // "pending" | "approved" | "rejected" | "expired"
+  scheduledFor: timestamp("scheduled_for").notNull(), // When to forward
+  expiresAt: timestamp("expires_at"), // Auto-approval timeout
+  
+  approvedBy: varchar("approved_by").references(() => users.id),
+  approvedAt: timestamp("approved_at"),
+  
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+// Phase 3: System Statistics
+export const systemStats = pgTable("system_stats", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }),
+  mappingId: varchar("mapping_id").references(() => forwardingMappings.id, { onDelete: "cascade" }),
+  
+  statType: text("stat_type").notNull(), // "hourly" | "daily" | "total"
+  statPeriod: text("stat_period").notNull(), // YYYY-MM-DD-HH or YYYY-MM-DD
+  
+  messagesProcessed: integer("messages_processed").notNull().default(0),
+  messagesForwarded: integer("messages_forwarded").notNull().default(0),
+  messagesFiltered: integer("messages_filtered").notNull().default(0),
+  messagesBlocked: integer("messages_blocked").notNull().default(0),
+  messagesErrored: integer("messages_errored").notNull().default(0),
+  
+  // Phase 3 specific stats
+  messagesUpdated: integer("messages_updated").notNull().default(0),
+  messagesDeleted: integer("messages_deleted").notNull().default(0),
+  messagesApproved: integer("messages_approved").notNull().default(0),
+  messagesRejected: integer("messages_rejected").notNull().default(0),
+  
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+
+// Phase 3 Insert Schemas
+export const insertRegexEditingRuleSchema = createInsertSchema(regexEditingRules).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertMessageSyncSettingSchema = createInsertSchema(messageSyncSettings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertMessageTrackerSchema = createInsertSchema(messageTracker).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertMessageDelaySettingSchema = createInsertSchema(messageDelaySettings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertPendingMessageSchema = createInsertSchema(pendingMessages).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertSystemStatSchema = createInsertSchema(systemStats).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Phase 3 Types
+export type InsertRegexEditingRule = z.infer<typeof insertRegexEditingRuleSchema>;
+export type RegexEditingRule = typeof regexEditingRules.$inferSelect;
+
+export type InsertMessageSyncSetting = z.infer<typeof insertMessageSyncSettingSchema>;
+export type MessageSyncSetting = typeof messageSyncSettings.$inferSelect;
+
+export type InsertMessageTracker = z.infer<typeof insertMessageTrackerSchema>;
+export type MessageTracker = typeof messageTracker.$inferSelect;
+
+export type InsertMessageDelaySetting = z.infer<typeof insertMessageDelaySettingSchema>;
+export type MessageDelaySetting = typeof messageDelaySettings.$inferSelect;
+
+export type InsertPendingMessage = z.infer<typeof insertPendingMessageSchema>;
+export type PendingMessage = typeof pendingMessages.$inferSelect;
+
+export type InsertSystemStat = z.infer<typeof insertSystemStatSchema>;
+export type SystemStat = typeof systemStats.$inferSelect;
+
+// Phase 3 API Response types
+export type SystemStatsResponse = {
+  hourly: {
+    messagesProcessed: number;
+    messagesForwarded: number;
+    messagesFiltered: number;
+    messagesBlocked: number;
+    messagesErrored: number;
+    messagesUpdated: number;
+    messagesDeleted: number;
+    messagesApproved: number;
+    messagesRejected: number;
+  };
+  daily: {
+    messagesProcessed: number;
+    messagesForwarded: number;
+    messagesFiltered: number;
+    messagesBlocked: number;
+    messagesErrored: number;
+    messagesUpdated: number;
+    messagesDeleted: number;
+    messagesApproved: number;
+    messagesRejected: number;
+  };
+  total: {
+    messagesProcessed: number;
+    messagesForwarded: number;
+    messagesFiltered: number;
+    messagesBlocked: number;
+    messagesErrored: number;
+    messagesUpdated: number;
+    messagesDeleted: number;
+    messagesApproved: number;
+    messagesRejected: number;
+  };
+};
+
+export type PendingMessageWithDetails = PendingMessage & {
+  mapping: ForwardingMapping;
+  sourceTitle: string;
+  destinationTitle: string;
+};

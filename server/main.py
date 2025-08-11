@@ -17,6 +17,10 @@ from server.api.sessions import sessions_router
 from server.api.workers import workers_router
 from server.api.users import users_router
 from server.api.dashboard import dashboard_router
+# Phase 3 routers
+from server.api.regex_rules import router as regex_rules_router
+from server.api.statistics import router as statistics_router
+from server.api.pending_messages import router as pending_messages_router
 from server.utils.logger import setup_logging, logger
 
 # Initialize logging
@@ -44,6 +48,10 @@ app.include_router(dashboard_router, prefix="/api/dashboard", tags=["dashboard"]
 app.include_router(sessions_router, prefix="/api/sessions", tags=["sessions"])
 app.include_router(workers_router, prefix="/api/workers", tags=["workers"])
 app.include_router(users_router, prefix="/api/users", tags=["users"])
+# Phase 3 routes
+app.include_router(regex_rules_router, prefix="/api/regex-rules", tags=["regex-rules"])
+app.include_router(statistics_router, prefix="/api/statistics", tags=["statistics"])
+app.include_router(pending_messages_router, prefix="/api/pending-messages", tags=["pending-messages"])
 
 @app.on_event("startup")
 async def startup_event():

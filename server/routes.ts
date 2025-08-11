@@ -8,7 +8,14 @@ import {
   insertWorkerSchema,
   insertSourceSchema,
   insertDestinationSchema,
-  insertForwardingMappingSchema
+  insertForwardingMappingSchema,
+  // Phase 3 schemas
+  insertRegexEditingRuleSchema,
+  insertMessageSyncSettingSchema,
+  insertMessageTrackerSchema,
+  insertMessageDelaySettingSchema,
+  insertPendingMessageSchema,
+  insertSystemStatSchema
 } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -424,6 +431,267 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Logs fetch error:", error);
       res.status(500).json({ message: "Failed to fetch logs" });
+    }
+  });
+
+  // Phase 3: Regex Editing Rules endpoints
+  app.get("/api/regex-rules", async (req, res) => {
+    try {
+      const { userId, mappingId } = req.query;
+      let rules;
+      
+      if (userId) {
+        rules = await storage.getRegexEditingRulesByUserId(userId as string);
+      } else if (mappingId) {
+        rules = await storage.getRegexEditingRulesByMappingId(mappingId as string);
+      } else {
+        return res.status(400).json({ message: "userId or mappingId required" });
+      }
+      
+      res.json(rules);
+    } catch (error) {
+      console.error("Regex rules fetch error:", error);
+      res.status(500).json({ message: "Failed to fetch regex rules" });
+    }
+  });
+
+  app.post("/api/regex-rules", async (req, res) => {
+    try {
+      const ruleData = insertRegexEditingRuleSchema.parse(req.body);
+      const rule = await storage.createRegexEditingRule(ruleData);
+      res.status(201).json(rule);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid regex rule data", errors: error.errors });
+      }
+      console.error("Regex rule creation error:", error);
+      res.status(500).json({ message: "Failed to create regex rule" });
+    }
+  });
+
+  app.put("/api/regex-rules/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updates = req.body;
+      const rule = await storage.updateRegexEditingRule(id, updates);
+      
+      if (!rule) {
+        return res.status(404).json({ message: "Regex rule not found" });
+      }
+      
+      res.json(rule);
+    } catch (error) {
+      console.error("Regex rule update error:", error);
+      res.status(500).json({ message: "Failed to update regex rule" });
+    }
+  });
+
+  app.delete("/api/regex-rules/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteRegexEditingRule(id);
+      
+      if (!deleted) {
+        return res.status(404).json({ message: "Regex rule not found" });
+      }
+      
+      res.json({ message: "Regex rule deleted successfully" });
+    } catch (error) {
+      console.error("Regex rule deletion error:", error);
+      res.status(500).json({ message: "Failed to delete regex rule" });
+    }
+  });
+
+  // Phase 3: Message Sync Settings endpoints
+  app.get("/api/sync-settings", async (req, res) => {
+    try {
+      const { userId, mappingId } = req.query;
+      let settings;
+      
+      if (userId) {
+        settings = await storage.getMessageSyncSettingsByUserId(userId as string);
+      } else if (mappingId) {
+        settings = await storage.getMessageSyncSettingsByMappingId(mappingId as string);
+      } else {
+        return res.status(400).json({ message: "userId or mappingId required" });
+      }
+      
+      res.json(settings);
+    } catch (error) {
+      console.error("Sync settings fetch error:", error);
+      res.status(500).json({ message: "Failed to fetch sync settings" });
+    }
+  });
+
+  app.post("/api/sync-settings", async (req, res) => {
+    try {
+      const settingData = insertMessageSyncSettingSchema.parse(req.body);
+      const setting = await storage.createMessageSyncSetting(settingData);
+      res.status(201).json(setting);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid sync setting data", errors: error.errors });
+      }
+      console.error("Sync setting creation error:", error);
+      res.status(500).json({ message: "Failed to create sync setting" });
+    }
+  });
+
+  app.put("/api/sync-settings/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updates = req.body;
+      const setting = await storage.updateMessageSyncSetting(id, updates);
+      
+      if (!setting) {
+        return res.status(404).json({ message: "Sync setting not found" });
+      }
+      
+      res.json(setting);
+    } catch (error) {
+      console.error("Sync setting update error:", error);
+      res.status(500).json({ message: "Failed to update sync setting" });
+    }
+  });
+
+  // Phase 3: Message Delay Settings endpoints
+  app.get("/api/delay-settings", async (req, res) => {
+    try {
+      const { userId, mappingId } = req.query;
+      let settings;
+      
+      if (userId) {
+        settings = await storage.getMessageDelaySettingsByUserId(userId as string);
+      } else if (mappingId) {
+        settings = await storage.getMessageDelaySettingsByMappingId(mappingId as string);
+      } else {
+        return res.status(400).json({ message: "userId or mappingId required" });
+      }
+      
+      res.json(settings);
+    } catch (error) {
+      console.error("Delay settings fetch error:", error);
+      res.status(500).json({ message: "Failed to fetch delay settings" });
+    }
+  });
+
+  app.post("/api/delay-settings", async (req, res) => {
+    try {
+      const settingData = insertMessageDelaySettingSchema.parse(req.body);
+      const setting = await storage.createMessageDelaySetting(settingData);
+      res.status(201).json(setting);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid delay setting data", errors: error.errors });
+      }
+      console.error("Delay setting creation error:", error);
+      res.status(500).json({ message: "Failed to create delay setting" });
+    }
+  });
+
+  app.put("/api/delay-settings/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updates = req.body;
+      const setting = await storage.updateMessageDelaySetting(id, updates);
+      
+      if (!setting) {
+        return res.status(404).json({ message: "Delay setting not found" });
+      }
+      
+      res.json(setting);
+    } catch (error) {
+      console.error("Delay setting update error:", error);
+      res.status(500).json({ message: "Failed to update delay setting" });
+    }
+  });
+
+  // Phase 3: Pending Messages endpoints
+  app.get("/api/pending-messages", async (req, res) => {
+    try {
+      const { userId } = req.query;
+      
+      if (!userId) {
+        return res.status(400).json({ message: "userId required" });
+      }
+      
+      const messages = await storage.getPendingMessagesByUserId(userId as string);
+      res.json(messages);
+    } catch (error) {
+      console.error("Pending messages fetch error:", error);
+      res.status(500).json({ message: "Failed to fetch pending messages" });
+    }
+  });
+
+  app.put("/api/pending-messages/:id/approve", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { approvedBy } = req.body;
+      
+      const message = await storage.updatePendingMessage(id, {
+        status: 'approved',
+        approvedBy,
+        approvedAt: new Date(),
+      });
+      
+      if (!message) {
+        return res.status(404).json({ message: "Pending message not found" });
+      }
+      
+      res.json(message);
+    } catch (error) {
+      console.error("Message approval error:", error);
+      res.status(500).json({ message: "Failed to approve message" });
+    }
+  });
+
+  app.put("/api/pending-messages/:id/reject", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { approvedBy } = req.body;
+      
+      const message = await storage.updatePendingMessage(id, {
+        status: 'rejected',
+        approvedBy,
+        approvedAt: new Date(),
+      });
+      
+      if (!message) {
+        return res.status(404).json({ message: "Pending message not found" });
+      }
+      
+      res.json(message);
+    } catch (error) {
+      console.error("Message rejection error:", error);
+      res.status(500).json({ message: "Failed to reject message" });
+    }
+  });
+
+  // Phase 3: System Statistics endpoints
+  app.get("/api/statistics", async (req, res) => {
+    try {
+      const { userId } = req.query;
+      const stats = await storage.getSystemStatsResponse(userId as string | undefined);
+      res.json(stats);
+    } catch (error) {
+      console.error("Statistics fetch error:", error);
+      res.status(500).json({ message: "Failed to fetch statistics" });
+    }
+  });
+
+  app.post("/api/statistics/increment", async (req, res) => {
+    try {
+      const { statType, period, field, amount = 1, userId, mappingId } = req.body;
+      
+      if (!statType || !period || !field) {
+        return res.status(400).json({ message: "statType, period, and field are required" });
+      }
+      
+      await storage.incrementSystemStat(statType, period, field, amount, userId, mappingId);
+      res.json({ message: "Statistic incremented successfully" });
+    } catch (error) {
+      console.error("Statistics increment error:", error);
+      res.status(500).json({ message: "Failed to increment statistic" });
     }
   });
 

@@ -61,6 +61,24 @@ export default function DashboardLayout({ children }: SidebarProps) {
       testId: "nav-logs"
     },
     {
+      name: "Regex Rules",
+      path: "/regex-rules",
+      icon: "fas fa-code",
+      testId: "nav-regex-rules"
+    },
+    {
+      name: "Pending Messages",
+      path: "/pending-messages",
+      icon: "fas fa-clock",
+      testId: "nav-pending-messages"
+    },
+    {
+      name: "Statistics",
+      path: "/statistics",
+      icon: "fas fa-chart-bar",
+      testId: "nav-statistics"
+    },
+    {
       name: "Workers",
       path: "/workers",
       icon: "fas fa-cogs",

@@ -14,6 +14,10 @@ import DestinationsPage from "@/pages/DestinationsPage";
 import ForwardingPage from "@/pages/ForwardingPage";
 import LogsPage from "@/pages/LogsPage";
 import NotFound from "@/pages/not-found";
+// Phase 3 pages
+import RegexRules from "@/pages/RegexRules";
+import PendingMessages from "@/pages/PendingMessages";
+import Statistics from "@/pages/Statistics";
 
 function Router() {
   return (
@@ -29,6 +33,9 @@ function Router() {
       <Route path="/destinations" component={DestinationsPage} />
       <Route path="/forwarding" component={ForwardingPage} />
       <Route path="/logs" component={LogsPage} />
+      <Route path="/regex-rules" component={RegexRules} />
+      <Route path="/pending-messages" component={PendingMessages} />
+      <Route path="/statistics" component={Statistics} />
       <Route component={NotFound} />
     </Switch>
   );

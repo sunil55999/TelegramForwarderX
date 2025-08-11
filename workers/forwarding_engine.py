@@ -1,14 +1,17 @@
 """
-Core Message Forwarding Engine for AutoForwardX Phase 2
+Core Message Forwarding Engine for AutoForwardX Phase 3
 
-Handles message processing, filtering, editing, and forwarding with full feature support.
+Handles advanced message processing, filtering, editing, and forwarding with 
+Phase 3 features: regex editing rules, message sync, delay/approval system.
 """
 
 import asyncio
 import re
 import time
+import hashlib
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from telethon import TelegramClient, events
 from telethon.tl.types import Message, MessageMediaPhoto, MessageMediaDocument, MessageMediaVideo
 from server.database import db
@@ -18,28 +21,35 @@ from server.utils.logger import logger
 class ProcessingResult:
     """Result of message processing"""
     success: bool
-    status: str  # "success" | "filtered" | "error" | "test"
+    status: str  # "success" | "filtered" | "error" | "test" | "delayed" | "pending_approval"
     processed_text: Optional[str] = None
     filter_reason: Optional[str] = None
     error_message: Optional[str] = None
     processing_time: int = 0
+    delay_until: Optional[datetime] = None
+    requires_approval: bool = False
+    message_hash: Optional[str] = None
 
 class MessageProcessor:
-    """Core message processing logic with filters and editing"""
+    """Core message processing logic with filters, editing, and Phase 3 features"""
     
     def __init__(self):
         self.url_pattern = re.compile(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+')
         self.hashtag_pattern = re.compile(r'#\w+')
         self.mention_pattern = re.compile(r'@\w+')
+        self.message_cache: Dict[str, Dict] = {}  # For tracking message updates
     
-    async def process_message(self, message: Message, mapping_config: Dict[str, Any]) -> ProcessingResult:
-        """Process a message through filters and editing"""
+    async def process_message(self, message: Message, mapping_config: Dict[str, Any], user_id: str) -> ProcessingResult:
+        """Process a message through filters, editing, and Phase 3 features"""
         start_time = time.time()
         
         try:
             # Extract message content
             message_text = message.message or ""
             message_type = self._get_message_type(message)
+            
+            # Create message hash for tracking
+            message_hash = self._create_message_hash(message)
             
             # Apply filters
             filter_result = self._apply_filters(message, message_text, message_type, mapping_config["filters"])
@@ -48,17 +58,48 @@ class MessageProcessor:
                     success=False,
                     status="filtered",
                     filter_reason=filter_result["reason"],
-                    processing_time=int((time.time() - start_time) * 1000)
+                    processing_time=int((time.time() - start_time) * 1000),
+                    message_hash=message_hash
                 )
             
-            # Apply editing
-            processed_text = await self._apply_editing(message, message_text, mapping_config["editing"])
+            # Apply editing (including Phase 3 regex rules)
+            processed_text = await self._apply_editing(message, message_text, mapping_config["editing"], user_id, mapping_config.get("mapping_id"))
+            
+            # Check delay/approval settings
+            delay_config = mapping_config.get("delay_settings", {})
+            if delay_config.get("enableDelay", False):
+                delay_seconds = delay_config.get("delaySeconds", 10)
+                requires_approval = delay_config.get("requireApproval", False)
+                
+                if requires_approval:
+                    # Store message for approval
+                    await self._store_pending_message(message, processed_text, mapping_config, user_id)
+                    return ProcessingResult(
+                        success=True,
+                        status="pending_approval",
+                        processed_text=processed_text,
+                        processing_time=int((time.time() - start_time) * 1000),
+                        requires_approval=True,
+                        message_hash=message_hash
+                    )
+                else:
+                    # Simple delay
+                    delay_until = datetime.now() + timedelta(seconds=delay_seconds)
+                    return ProcessingResult(
+                        success=True,
+                        status="delayed",
+                        processed_text=processed_text,
+                        processing_time=int((time.time() - start_time) * 1000),
+                        delay_until=delay_until,
+                        message_hash=message_hash
+                    )
             
             return ProcessingResult(
                 success=True,
                 status="success",
                 processed_text=processed_text,
-                processing_time=int((time.time() - start_time) * 1000)
+                processing_time=int((time.time() - start_time) * 1000),
+                message_hash=message_hash
             )
             
         except Exception as e:
@@ -160,9 +201,12 @@ class MessageProcessor:
         
         return {"passed": True, "reason": None}
     
-    async def _apply_editing(self, message: Message, text: str, editing: Dict[str, Any]) -> str:
-        """Apply message editing rules"""
+    async def _apply_editing(self, message: Message, text: str, editing: Dict[str, Any], user_id: str, mapping_id: Optional[str] = None) -> str:
+        """Apply message editing rules including Phase 3 regex rules"""
         processed_text = text
+        
+        # Phase 3: Apply regex editing rules first
+        processed_text = await self._apply_regex_rules(processed_text, user_id, mapping_id)
         
         # Remove sender info
         if editing.get("removeSenderInfo", False) and message.sender:
@@ -202,6 +246,140 @@ class MessageProcessor:
             processed_text = f"{processed_text}\n\n{footer}"
         
         return processed_text
+    
+    def _create_message_hash(self, message: Message) -> str:
+        """Create a unique hash for message tracking"""
+        content = f"{message.chat_id}_{message.id}_{message.message or ''}_{getattr(message, 'date', '')}"
+        return hashlib.md5(content.encode()).hexdigest()
+    
+    async def _apply_regex_rules(self, text: str, user_id: str, mapping_id: Optional[str] = None) -> str:
+        """Apply regex editing rules from Phase 3"""
+        try:
+            # Fetch regex rules from database
+            if mapping_id:
+                query = "SELECT * FROM regex_editing_rules WHERE mapping_id = ? AND is_active = true ORDER BY order_index"
+                rules = await db.fetch_all(query, [mapping_id])
+            else:
+                query = "SELECT * FROM regex_editing_rules WHERE user_id = ? AND is_active = true ORDER BY order_index"
+                rules = await db.fetch_all(query, [user_id])
+            
+            processed_text = text
+            
+            for rule in rules:
+                try:
+                    # Apply regex transformation
+                    pattern = re.compile(rule['pattern'], re.IGNORECASE if not rule['case_sensitive'] else 0)
+                    
+                    if rule['rule_type'] == 'find_replace':
+                        processed_text = pattern.sub(rule['replacement'] or '', processed_text)
+                    elif rule['rule_type'] == 'remove':
+                        processed_text = pattern.sub('', processed_text)
+                    elif rule['rule_type'] == 'extract':
+                        matches = pattern.findall(processed_text)
+                        if matches:
+                            processed_text = ' '.join(matches)
+                    elif rule['rule_type'] == 'conditional_replace':
+                        # Apply replacement only if condition is met
+                        if pattern.search(processed_text):
+                            processed_text = pattern.sub(rule['replacement'] or '', processed_text)
+                    
+                except re.error as e:
+                    logger.warning(f"Invalid regex pattern in rule {rule['id']}: {e}")
+                    continue
+            
+            return processed_text
+            
+        except Exception as e:
+            logger.error(f"Error applying regex rules: {e}")
+            return text
+    
+    async def _store_pending_message(self, message: Message, processed_text: str, mapping_config: Dict[str, Any], user_id: str):
+        """Store message for approval workflow"""
+        try:
+            query = """
+                INSERT INTO pending_messages (
+                    user_id, mapping_id, source_chat_id, message_id, original_text,
+                    processed_text, status, created_at, media_type
+                ) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)
+            """
+            
+            await db.execute(query, [
+                user_id,
+                mapping_config.get("mapping_id"),
+                str(message.chat_id),
+                str(message.id),
+                message.message or "",
+                processed_text,
+                datetime.now(),
+                self._get_message_type(message)
+            ])
+            
+            logger.info(f"Stored pending message {message.id} for approval")
+            
+        except Exception as e:
+            logger.error(f"Failed to store pending message: {e}")
+    
+    async def handle_message_update(self, message: Message, user_id: str, mapping_id: str):
+        """Handle message updates/edits for sync feature"""
+        try:
+            message_hash = self._create_message_hash(message)
+            
+            # Check if we have sync settings for this mapping
+            query = "SELECT * FROM message_sync_settings WHERE mapping_id = ? AND sync_updates = true"
+            sync_setting = await db.fetch_one(query, [mapping_id])
+            
+            if not sync_setting:
+                return
+            
+            # Track the original message for sync
+            query = """
+                INSERT OR REPLACE INTO message_tracker (
+                    source_chat_id, source_message_id, destination_chat_id,
+                    destination_message_id, mapping_id, user_id, message_hash,
+                    created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """
+            
+            await db.execute(query, [
+                str(message.chat_id),
+                str(message.id),
+                None,  # Will be set when message is forwarded
+                None,  # Will be set when message is forwarded
+                mapping_id,
+                user_id,
+                message_hash,
+                datetime.now(),
+                datetime.now()
+            ])
+            
+        except Exception as e:
+            logger.error(f"Error handling message update: {e}")
+    
+    async def handle_message_deletion(self, message_id: str, chat_id: str, user_id: str):
+        """Handle message deletions for sync feature"""
+        try:
+            # Find tracked messages that should be deleted
+            query = """
+                SELECT * FROM message_tracker mt
+                JOIN message_sync_settings mss ON mt.mapping_id = mss.mapping_id
+                WHERE mt.source_chat_id = ? AND mt.source_message_id = ?
+                AND mss.sync_deletions = true AND mt.user_id = ?
+            """
+            
+            tracked_messages = await db.fetch_all(query, [chat_id, message_id, user_id])
+            
+            for tracked in tracked_messages:
+                if tracked['destination_message_id']:
+                    # Delete the forwarded message
+                    # This would require the Telegram client to delete the destination message
+                    logger.info(f"Should delete forwarded message {tracked['destination_message_id']} in chat {tracked['destination_chat_id']}")
+                
+                # Update tracker
+                query = "UPDATE message_tracker SET deleted_at = ? WHERE id = ?"
+                await db.execute(query, [datetime.now(), tracked['id']])
+            
+        except Exception as e:
+            logger.error(f"Error handling message deletion: {e}")
 
 class ForwardingEngine:
     """Main forwarding engine that monitors sources and forwards messages"""
