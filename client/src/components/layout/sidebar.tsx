@@ -79,6 +79,24 @@ export default function DashboardLayout({ children }: SidebarProps) {
       testId: "nav-statistics"
     },
     {
+      name: "Multi-Accounts",
+      path: "/multi-accounts",
+      icon: "fas fa-user-friends",
+      testId: "nav-multi-accounts"
+    },
+    {
+      name: "Team Collaboration",
+      path: "/team-collaboration",
+      icon: "fas fa-users-cog",
+      testId: "nav-team-collaboration"
+    },
+    {
+      name: "Session Resilience",
+      path: "/session-resilience",
+      icon: "fas fa-shield-alt",
+      testId: "nav-session-resilience"
+    },
+    {
       name: "Workers",
       path: "/workers",
       icon: "fas fa-cogs",

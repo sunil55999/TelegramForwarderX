@@ -24,7 +24,16 @@ import {
   type TaskQueue, type InsertTaskQueue,
   type UserActivityLog, type InsertUserActivityLog,
   type WorkerMetrics, type InsertWorkerMetrics,
-  type UserPlanDetails, type ResourceUsageReport, type QueueMetrics
+  type UserPlanDetails, type ResourceUsageReport, type QueueMetrics,
+  // Phase 5 imports
+  type TelegramAccount, type InsertTelegramAccount,
+  type TeamMember, type InsertTeamMember,
+  type SessionFailure, type InsertSessionFailure,
+  type ReauthRequest, type InsertReauthRequest,
+  type AccountForwardingMapping, type InsertAccountForwardingMapping,
+  type SessionBackup, type InsertSessionBackup,
+  type SyncEvent, type InsertSyncEvent,
+  type AccountStatusInfo, type TeamInfo, type SessionHealthReport, type ReauthWorkflowStatus
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -180,6 +189,58 @@ export interface IStorage {
   getAllUsersWithPlans(): Promise<(User & { plan?: SubscriptionPlan })[]>;
   changeUserPlan(userId: string, newPlan: string): Promise<void>;
   forceStopUserSessions(userId: string): Promise<void>;
+
+  // Phase 5: Multi-Account Management
+  getTelegramAccount(id: string): Promise<TelegramAccount | undefined>;
+  getTelegramAccountsByUserId(userId: string): Promise<TelegramAccount[]>;
+  createTelegramAccount(account: InsertTelegramAccount): Promise<TelegramAccount>;
+  updateTelegramAccount(id: string, updates: Partial<TelegramAccount>): Promise<TelegramAccount | undefined>;
+  deleteTelegramAccount(id: string): Promise<boolean>;
+  getAccountStatusInfo(userId: string): Promise<AccountStatusInfo[]>;
+  enableAccountForwarding(accountId: string): Promise<void>;
+  disableAccountForwarding(accountId: string): Promise<void>;
+
+  // Phase 5: Team/Workspace Collaboration
+  createTeamMember(member: InsertTeamMember): Promise<TeamMember>;
+  getTeamMembers(ownerId: string): Promise<TeamMember[]>;
+  updateTeamMemberPermissions(memberId: string, permissions: string): Promise<void>;
+  removeTeamMember(ownerId: string, memberId: string): Promise<boolean>;
+  getTeamInfo(userId: string): Promise<TeamInfo | null>;
+  inviteTeamMember(ownerId: string, memberEmail: string, permissions: string): Promise<TeamMember>;
+
+  // Phase 5: Session Lifecycle & Error Handling
+  createSessionFailure(failure: InsertSessionFailure): Promise<SessionFailure>;
+  getSessionFailures(accountId: string): Promise<SessionFailure[]>;
+  updateSessionFailure(id: string, updates: Partial<SessionFailure>): Promise<void>;
+  getUnresolvedFailures(): Promise<SessionFailure[]>;
+  markFailureResolved(failureId: string): Promise<void>;
+  getSessionHealthReport(accountId: string): Promise<SessionHealthReport>;
+
+  // Phase 5: Re-Authentication Workflow
+  createReauthRequest(request: InsertReauthRequest): Promise<ReauthRequest>;
+  getReauthRequest(id: string): Promise<ReauthRequest | undefined>;
+  getReauthRequestByToken(authToken: string): Promise<ReauthRequest | undefined>;
+  updateReauthRequest(id: string, updates: Partial<ReauthRequest>): Promise<void>;
+  getActiveReauthRequests(userId: string): Promise<ReauthRequest[]>;
+  getReauthWorkflowStatus(requestId: string): Promise<ReauthWorkflowStatus | null>;
+
+  // Phase 5: Account-specific Forwarding Mappings
+  createAccountForwardingMapping(mapping: InsertAccountForwardingMapping): Promise<AccountForwardingMapping>;
+  getAccountForwardingMappings(accountId: string): Promise<AccountForwardingMapping[]>;
+  deleteAccountForwardingMapping(id: string): Promise<boolean>;
+  updateAccountForwardingMapping(id: string, updates: Partial<AccountForwardingMapping>): Promise<void>;
+
+  // Phase 5: Session Backup & Recovery
+  createSessionBackup(backup: InsertSessionBackup): Promise<SessionBackup>;
+  getSessionBackups(accountId: string): Promise<SessionBackup[]>;
+  validateSessionBackup(backupId: string): Promise<boolean>;
+  restoreFromBackup(accountId: string, backupId: string): Promise<void>;
+
+  // Phase 5: Real-time Sync Events
+  createSyncEvent(event: InsertSyncEvent): Promise<SyncEvent>;
+  getUnprocessedSyncEvents(userId?: string): Promise<SyncEvent[]>;
+  markSyncEventProcessed(eventId: string): Promise<void>;
+  processSyncEvents(userId: string): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -210,6 +271,15 @@ export class MemStorage implements IStorage {
   private taskQueue: Map<string, TaskQueue> = new Map();
   private userActivityLogs: Map<string, UserActivityLog> = new Map();
   private workerMetrics: Map<string, WorkerMetrics> = new Map();
+
+  // Phase 5 storage
+  private telegramAccounts: Map<string, TelegramAccount> = new Map();
+  private teamMembers: Map<string, TeamMember> = new Map();
+  private sessionFailures: Map<string, SessionFailure> = new Map();
+  private reauthRequests: Map<string, ReauthRequest> = new Map();
+  private accountForwardingMappings: Map<string, AccountForwardingMapping> = new Map();
+  private sessionBackups: Map<string, SessionBackup> = new Map();
+  private syncEvents: Map<string, SyncEvent> = new Map();
 
   constructor() {
     // Initialize with some default settings
@@ -1066,6 +1136,15 @@ export class MemStorage implements IStorage {
     const subscriptionPlan: SubscriptionPlan = {
       ...plan,
       id,
+      priority: plan.priority || 1,
+      planType: plan.planType || 'free',
+      planStatus: plan.planStatus || 'active',
+      maxSessions: plan.maxSessions || 1,
+      maxForwardingPairs: plan.maxForwardingPairs || 5,
+      startDate: plan.startDate || new Date(),
+      expiryDate: plan.expiryDate || null,
+      currentSessions: plan.currentSessions || 0,
+      currentPairs: plan.currentPairs || 0,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -1119,6 +1198,15 @@ export class MemStorage implements IStorage {
     const resource: ResourceTracking = {
       ...usage,
       id,
+      isActive: usage.isActive ?? true,
+      userId: usage.userId || null,
+      workerId: usage.workerId || null,
+      sessionId: usage.sessionId || null,
+      lastActivity: usage.lastActivity || new Date(),
+      ramUsageBytes: usage.ramUsageBytes || 0,
+      cpuUsagePercent: usage.cpuUsagePercent || 0,
+      messagesPerMinute: usage.messagesPerMinute || 0,
+      isPaused: usage.isPaused ?? false,
       createdAt: new Date(),
     };
     this.resourceTracking.set(id, resource);
@@ -1185,6 +1273,16 @@ export class MemStorage implements IStorage {
     const queueTask: TaskQueue = {
       ...task,
       id,
+      status: task.status || 'pending',
+      workerId: task.workerId || null,
+      sessionId: task.sessionId || null,
+      priority: task.priority || 1,
+      errorMessage: task.errorMessage || null,
+      scheduledFor: task.scheduledFor || new Date(),
+      startedAt: task.startedAt || null,
+      completedAt: task.completedAt || null,
+      retryCount: task.retryCount || 0,
+      maxRetries: task.maxRetries || 3,
       createdAt: new Date(),
     };
     this.taskQueue.set(id, queueTask);
@@ -1377,7 +1475,7 @@ export class MemStorage implements IStorage {
 
   private initializeDefaultSubscriptionPlans() {
     // Initialize subscription plans for existing users
-    for (const user of this.users.values()) {
+    for (const user of Array.from(this.users.values())) {
       if (!this.subscriptionPlans.has(user.id)) {
         const defaultPlan: SubscriptionPlan = {
           id: randomUUID(),
@@ -1396,6 +1494,357 @@ export class MemStorage implements IStorage {
         };
         this.subscriptionPlans.set(user.id, defaultPlan);
       }
+    }
+  }
+
+  // Phase 5: Multi-Account Management
+  async getTelegramAccount(id: string): Promise<TelegramAccount | undefined> {
+    return this.telegramAccounts.get(id);
+  }
+
+  async getTelegramAccountsByUserId(userId: string): Promise<TelegramAccount[]> {
+    return Array.from(this.telegramAccounts.values()).filter(account => account.userId === userId);
+  }
+
+  async createTelegramAccount(insertAccount: InsertTelegramAccount): Promise<TelegramAccount> {
+    const id = randomUUID();
+    const account: TelegramAccount = {
+      ...insertAccount,
+      id,
+      status: insertAccount.status || 'inactive',
+      lastError: insertAccount.lastError || null,
+      lastActivity: insertAccount.lastActivity || null,
+      isEnabled: insertAccount.isEnabled ?? true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.telegramAccounts.set(id, account);
+    return account;
+  }
+
+  async updateTelegramAccount(id: string, updates: Partial<TelegramAccount>): Promise<TelegramAccount | undefined> {
+    const account = this.telegramAccounts.get(id);
+    if (!account) return undefined;
+    
+    const updatedAccount = { ...account, ...updates, updatedAt: new Date() };
+    this.telegramAccounts.set(id, updatedAccount);
+    return updatedAccount;
+  }
+
+  async deleteTelegramAccount(id: string): Promise<boolean> {
+    return this.telegramAccounts.delete(id);
+  }
+
+  async getAccountStatusInfo(userId: string): Promise<AccountStatusInfo[]> {
+    const accounts = await this.getTelegramAccountsByUserId(userId);
+    return accounts.map(account => ({
+      accountId: account.id,
+      accountName: account.accountName,
+      phoneNumber: account.phoneNumber,
+      status: account.status,
+      lastError: account.lastError || undefined,
+      lastActivity: account.lastActivity?.toISOString(),
+      isEnabled: account.isEnabled,
+      forwardingPairs: 0, // TODO: Calculate from accountForwardingMappings
+      totalMessages: 0, // TODO: Calculate from logs
+    }));
+  }
+
+  async enableAccountForwarding(accountId: string): Promise<void> {
+    await this.updateTelegramAccount(accountId, { isEnabled: true });
+  }
+
+  async disableAccountForwarding(accountId: string): Promise<void> {
+    await this.updateTelegramAccount(accountId, { isEnabled: false });
+  }
+
+  // Phase 5: Team/Workspace Collaboration
+  async createTeamMember(insertMember: InsertTeamMember): Promise<TeamMember> {
+    const id = randomUUID();
+    const member: TeamMember = {
+      ...insertMember,
+      id,
+      permissions: insertMember.permissions || 'read',
+      status: insertMember.status || 'pending',
+      invitedAt: insertMember.invitedAt || new Date(),
+      joinedAt: insertMember.joinedAt || null,
+      createdAt: new Date(),
+    };
+    this.teamMembers.set(id, member);
+    return member;
+  }
+
+  async getTeamMembers(ownerId: string): Promise<TeamMember[]> {
+    return Array.from(this.teamMembers.values()).filter(member => member.ownerId === ownerId);
+  }
+
+  async updateTeamMemberPermissions(memberId: string, permissions: string): Promise<void> {
+    const member = this.teamMembers.get(memberId);
+    if (member) {
+      this.teamMembers.set(memberId, { ...member, permissions });
+    }
+  }
+
+  async removeTeamMember(ownerId: string, memberId: string): Promise<boolean> {
+    const member = this.teamMembers.get(memberId);
+    if (member && member.ownerId === ownerId) {
+      return this.teamMembers.delete(memberId);
+    }
+    return false;
+  }
+
+  async getTeamInfo(userId: string): Promise<TeamInfo | null> {
+    const members = await this.getTeamMembers(userId);
+    if (members.length === 0) return null;
+
+    const memberDetails = await Promise.all(
+      members.map(async member => {
+        const user = await this.getUser(member.memberId);
+        return {
+          memberId: member.memberId,
+          username: user?.username || 'Unknown',
+          email: user?.email || 'Unknown',
+          permissions: member.permissions,
+          status: member.status,
+          joinedAt: member.joinedAt?.toISOString(),
+        };
+      })
+    );
+
+    return {
+      ownerId: userId,
+      members: memberDetails,
+      maxMembers: 3, // Elite plan limit
+      currentMembers: members.length,
+    };
+  }
+
+  async inviteTeamMember(ownerId: string, memberEmail: string, permissions: string): Promise<TeamMember> {
+    const member = await this.getUserByEmail(memberEmail);
+    if (!member) {
+      throw new Error('User not found');
+    }
+
+    return this.createTeamMember({
+      ownerId,
+      memberId: member.id,
+      permissions,
+      status: 'pending',
+      invitedAt: new Date(),
+    });
+  }
+
+  // Phase 5: Session Lifecycle & Error Handling
+  async createSessionFailure(insertFailure: InsertSessionFailure): Promise<SessionFailure> {
+    const id = randomUUID();
+    const failure: SessionFailure = {
+      ...insertFailure,
+      id,
+      errorDetails: insertFailure.errorDetails || {},
+      retryCount: insertFailure.retryCount || 0,
+      nextRetryAt: insertFailure.nextRetryAt || null,
+      isResolved: insertFailure.isResolved ?? false,
+      createdAt: new Date(),
+      resolvedAt: insertFailure.resolvedAt || null,
+    };
+    this.sessionFailures.set(id, failure);
+    return failure;
+  }
+
+  async getSessionFailures(accountId: string): Promise<SessionFailure[]> {
+    return Array.from(this.sessionFailures.values()).filter(failure => failure.accountId === accountId);
+  }
+
+  async updateSessionFailure(id: string, updates: Partial<SessionFailure>): Promise<void> {
+    const failure = this.sessionFailures.get(id);
+    if (failure) {
+      this.sessionFailures.set(id, { ...failure, ...updates });
+    }
+  }
+
+  async getUnresolvedFailures(): Promise<SessionFailure[]> {
+    return Array.from(this.sessionFailures.values()).filter(failure => !failure.isResolved);
+  }
+
+  async markFailureResolved(failureId: string): Promise<void> {
+    await this.updateSessionFailure(failureId, { isResolved: true, resolvedAt: new Date() });
+  }
+
+  async getSessionHealthReport(accountId: string): Promise<SessionHealthReport> {
+    const account = await this.getTelegramAccount(accountId);
+    const failures = await this.getSessionFailures(accountId);
+    const unresolvedFailures = failures.filter(f => !f.isResolved);
+
+    return {
+      accountId,
+      status: account?.status || 'unknown',
+      lastError: account?.lastError || undefined,
+      retryCount: unresolvedFailures.reduce((sum, f) => sum + f.retryCount, 0),
+      nextRetryAt: unresolvedFailures[0]?.nextRetryAt?.toISOString(),
+      uptime: account?.lastActivity ? Date.now() - account.lastActivity.getTime() : 0,
+      lastActivity: account?.lastActivity?.toISOString(),
+      connectionQuality: unresolvedFailures.length === 0 ? 'excellent' : 
+                        unresolvedFailures.length < 3 ? 'good' : 
+                        unresolvedFailures.length < 5 ? 'poor' : 'critical',
+    };
+  }
+
+  // Phase 5: Re-Authentication Workflow
+  async createReauthRequest(insertRequest: InsertReauthRequest): Promise<ReauthRequest> {
+    const id = randomUUID();
+    const request: ReauthRequest = {
+      ...insertRequest,
+      id,
+      requestType: insertRequest.requestType || 'session_expired',
+      status: insertRequest.status || 'pending',
+      completedAt: insertRequest.completedAt || null,
+      createdAt: new Date(),
+    };
+    this.reauthRequests.set(id, request);
+    return request;
+  }
+
+  async getReauthRequest(id: string): Promise<ReauthRequest | undefined> {
+    return this.reauthRequests.get(id);
+  }
+
+  async getReauthRequestByToken(authToken: string): Promise<ReauthRequest | undefined> {
+    return Array.from(this.reauthRequests.values()).find(req => req.authToken === authToken);
+  }
+
+  async updateReauthRequest(id: string, updates: Partial<ReauthRequest>): Promise<void> {
+    const request = this.reauthRequests.get(id);
+    if (request) {
+      this.reauthRequests.set(id, { ...request, ...updates });
+    }
+  }
+
+  async getActiveReauthRequests(userId: string): Promise<ReauthRequest[]> {
+    return Array.from(this.reauthRequests.values())
+      .filter(req => req.userId === userId && req.status === 'pending' && req.expiresAt > new Date());
+  }
+
+  async getReauthWorkflowStatus(requestId: string): Promise<ReauthWorkflowStatus | null> {
+    const request = await this.getReauthRequest(requestId);
+    if (!request) return null;
+
+    return {
+      requestId: request.id,
+      accountId: request.accountId,
+      status: request.status,
+      authToken: request.authToken,
+      expiresAt: request.expiresAt.toISOString(),
+      steps: {
+        current: request.status === 'pending' ? 'waiting_for_user' : 'completed',
+        completed: request.status === 'completed' ? ['token_generated', 'auth_completed'] : ['token_generated'],
+        remaining: request.status === 'pending' ? ['auth_completion'] : [],
+      },
+    };
+  }
+
+  // Phase 5: Account-specific Forwarding Mappings
+  async createAccountForwardingMapping(insertMapping: InsertAccountForwardingMapping): Promise<AccountForwardingMapping> {
+    const id = randomUUID();
+    const mapping: AccountForwardingMapping = {
+      ...insertMapping,
+      id,
+      isActive: insertMapping.isActive ?? true,
+      priority: insertMapping.priority || 1,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.accountForwardingMappings.set(id, mapping);
+    return mapping;
+  }
+
+  async getAccountForwardingMappings(accountId: string): Promise<AccountForwardingMapping[]> {
+    return Array.from(this.accountForwardingMappings.values()).filter(mapping => mapping.accountId === accountId);
+  }
+
+  async deleteAccountForwardingMapping(id: string): Promise<boolean> {
+    return this.accountForwardingMappings.delete(id);
+  }
+
+  async updateAccountForwardingMapping(id: string, updates: Partial<AccountForwardingMapping>): Promise<void> {
+    const mapping = this.accountForwardingMappings.get(id);
+    if (mapping) {
+      this.accountForwardingMappings.set(id, { ...mapping, ...updates, updatedAt: new Date() });
+    }
+  }
+
+  // Phase 5: Session Backup & Recovery
+  async createSessionBackup(insertBackup: InsertSessionBackup): Promise<SessionBackup> {
+    const id = randomUUID();
+    const backup: SessionBackup = {
+      ...insertBackup,
+      id,
+      isValid: insertBackup.isValid ?? true,
+      createdAt: new Date(),
+    };
+    this.sessionBackups.set(id, backup);
+    return backup;
+  }
+
+  async getSessionBackups(accountId: string): Promise<SessionBackup[]> {
+    return Array.from(this.sessionBackups.values()).filter(backup => backup.accountId === accountId);
+  }
+
+  async validateSessionBackup(backupId: string): Promise<boolean> {
+    const backup = this.sessionBackups.get(backupId);
+    return backup?.isValid || false;
+  }
+
+  async restoreFromBackup(accountId: string, backupId: string): Promise<void> {
+    const backup = this.sessionBackups.get(backupId);
+    if (!backup || backup.accountId !== accountId) {
+      throw new Error('Backup not found');
+    }
+    
+    if (!backup.isValid) {
+      throw new Error('Backup is invalid');
+    }
+
+    // Update account to use backup session
+    await this.updateTelegramAccount(accountId, {
+      sessionPath: backup.backupPath,
+      status: 'inactive', // Requires restart
+    });
+  }
+
+  // Phase 5: Real-time Sync Events
+  async createSyncEvent(insertEvent: InsertSyncEvent): Promise<SyncEvent> {
+    const id = randomUUID();
+    const event: SyncEvent = {
+      ...insertEvent,
+      id,
+      isProcessed: insertEvent.isProcessed ?? false,
+      createdAt: new Date(),
+      processedAt: insertEvent.processedAt || null,
+    };
+    this.syncEvents.set(id, event);
+    return event;
+  }
+
+  async getUnprocessedSyncEvents(userId?: string): Promise<SyncEvent[]> {
+    let events = Array.from(this.syncEvents.values()).filter(event => !event.isProcessed);
+    if (userId) {
+      events = events.filter(event => event.userId === userId);
+    }
+    return events;
+  }
+
+  async markSyncEventProcessed(eventId: string): Promise<void> {
+    const event = this.syncEvents.get(eventId);
+    if (event) {
+      this.syncEvents.set(eventId, { ...event, isProcessed: true, processedAt: new Date() });
+    }
+  }
+
+  async processSyncEvents(userId: string): Promise<void> {
+    const events = await this.getUnprocessedSyncEvents(userId);
+    for (const event of events) {
+      // Process each event based on type
+      await this.markSyncEventProcessed(event.id);
     }
   }
 }

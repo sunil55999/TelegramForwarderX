@@ -22,6 +22,10 @@ import Phase3Verification from "@/pages/Phase3Verification";
 import Phase4Verification from "@/pages/Phase4Verification";
 import AdminDashboard from "@/pages/AdminDashboard";
 import SubscriptionDashboard from "@/pages/SubscriptionDashboard";
+// Phase 5 pages
+import MultiAccountManagement from "@/pages/MultiAccountManagement";
+import TeamCollaboration from "@/pages/TeamCollaboration";
+import SessionResilience from "@/pages/SessionResilience";
 
 function Router() {
   return (
@@ -44,6 +48,9 @@ function Router() {
       <Route path="/phase4-verification" component={Phase4Verification} />
       <Route path="/subscription" component={SubscriptionDashboard} />
       <Route path="/admin" component={AdminDashboard} />
+      <Route path="/multi-accounts" component={MultiAccountManagement} />
+      <Route path="/team-collaboration" component={TeamCollaboration} />
+      <Route path="/session-resilience" component={SessionResilience} />
       <Route component={NotFound} />
     </Switch>
   );

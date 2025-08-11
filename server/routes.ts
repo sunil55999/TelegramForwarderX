@@ -15,7 +15,15 @@ import {
   insertMessageTrackerSchema,
   insertMessageDelaySettingSchema,
   insertPendingMessageSchema,
-  insertSystemStatSchema
+  insertSystemStatSchema,
+  // Phase 5 schemas
+  insertTelegramAccountSchema,
+  insertTeamMemberSchema,
+  insertSessionFailureSchema,
+  insertReauthRequestSchema,
+  insertAccountForwardingMappingSchema,
+  insertSessionBackupSchema,
+  insertSyncEventSchema
 } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -1086,6 +1094,349 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Force stop user sessions error:", error);
       res.status(500).json({ message: "Failed to force stop user sessions" });
+    }
+  });
+
+  // Phase 5: Multi-Account Management
+  app.get("/api/accounts", async (req, res) => {
+    try {
+      const { userId } = req.query;
+      if (!userId) {
+        return res.status(400).json({ message: "User ID required" });
+      }
+      const accounts = await storage.getTelegramAccountsByUserId(userId as string);
+      res.json(accounts);
+    } catch (error) {
+      console.error("Get telegram accounts error:", error);
+      res.status(500).json({ message: "Failed to get telegram accounts" });
+    }
+  });
+
+  app.post("/api/accounts", async (req, res) => {
+    try {
+      const validatedAccount = insertTelegramAccountSchema.parse(req.body);
+      const account = await storage.createTelegramAccount(validatedAccount);
+      res.status(201).json(account);
+    } catch (error) {
+      console.error("Create telegram account error:", error);
+      res.status(500).json({ message: "Failed to create telegram account" });
+    }
+  });
+
+  app.put("/api/accounts/:accountId", async (req, res) => {
+    try {
+      const { accountId } = req.params;
+      const account = await storage.updateTelegramAccount(accountId, req.body);
+      if (!account) {
+        return res.status(404).json({ message: "Account not found" });
+      }
+      res.json(account);
+    } catch (error) {
+      console.error("Update telegram account error:", error);
+      res.status(500).json({ message: "Failed to update telegram account" });
+    }
+  });
+
+  app.delete("/api/accounts/:accountId", async (req, res) => {
+    try {
+      const { accountId } = req.params;
+      const deleted = await storage.deleteTelegramAccount(accountId);
+      if (!deleted) {
+        return res.status(404).json({ message: "Account not found" });
+      }
+      res.json({ success: true, message: "Account deleted successfully" });
+    } catch (error) {
+      console.error("Delete telegram account error:", error);
+      res.status(500).json({ message: "Failed to delete telegram account" });
+    }
+  });
+
+  app.get("/api/accounts/:userId/status", async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const statusInfo = await storage.getAccountStatusInfo(userId);
+      res.json(statusInfo);
+    } catch (error) {
+      console.error("Get account status error:", error);
+      res.status(500).json({ message: "Failed to get account status" });
+    }
+  });
+
+  app.post("/api/accounts/:accountId/enable", async (req, res) => {
+    try {
+      const { accountId } = req.params;
+      await storage.enableAccountForwarding(accountId);
+      res.json({ success: true, message: "Account forwarding enabled" });
+    } catch (error) {
+      console.error("Enable account forwarding error:", error);
+      res.status(500).json({ message: "Failed to enable account forwarding" });
+    }
+  });
+
+  app.post("/api/accounts/:accountId/disable", async (req, res) => {
+    try {
+      const { accountId } = req.params;
+      await storage.disableAccountForwarding(accountId);
+      res.json({ success: true, message: "Account forwarding disabled" });
+    } catch (error) {
+      console.error("Disable account forwarding error:", error);
+      res.status(500).json({ message: "Failed to disable account forwarding" });
+    }
+  });
+
+  // Phase 5: Team/Workspace Collaboration
+  app.get("/api/team/:ownerId", async (req, res) => {
+    try {
+      const { ownerId } = req.params;
+      const teamInfo = await storage.getTeamInfo(ownerId);
+      res.json(teamInfo);
+    } catch (error) {
+      console.error("Get team info error:", error);
+      res.status(500).json({ message: "Failed to get team info" });
+    }
+  });
+
+  app.post("/api/team/:ownerId/invite", async (req, res) => {
+    try {
+      const { ownerId } = req.params;
+      const { memberEmail, permissions } = req.body;
+      const member = await storage.inviteTeamMember(ownerId, memberEmail, permissions);
+      res.status(201).json(member);
+    } catch (error) {
+      console.error("Invite team member error:", error);
+      res.status(500).json({ message: "Failed to invite team member" });
+    }
+  });
+
+  app.put("/api/team/member/:memberId/permissions", async (req, res) => {
+    try {
+      const { memberId } = req.params;
+      const { permissions } = req.body;
+      await storage.updateTeamMemberPermissions(memberId, permissions);
+      res.json({ success: true, message: "Permissions updated" });
+    } catch (error) {
+      console.error("Update team member permissions error:", error);
+      res.status(500).json({ message: "Failed to update permissions" });
+    }
+  });
+
+  app.delete("/api/team/:ownerId/member/:memberId", async (req, res) => {
+    try {
+      const { ownerId, memberId } = req.params;
+      const removed = await storage.removeTeamMember(ownerId, memberId);
+      if (!removed) {
+        return res.status(404).json({ message: "Team member not found" });
+      }
+      res.json({ success: true, message: "Team member removed" });
+    } catch (error) {
+      console.error("Remove team member error:", error);
+      res.status(500).json({ message: "Failed to remove team member" });
+    }
+  });
+
+  // Phase 5: Session Lifecycle & Error Handling
+  app.post("/api/sessions/failures", async (req, res) => {
+    try {
+      const validatedFailure = insertSessionFailureSchema.parse(req.body);
+      const failure = await storage.createSessionFailure(validatedFailure);
+      res.status(201).json(failure);
+    } catch (error) {
+      console.error("Create session failure error:", error);
+      res.status(500).json({ message: "Failed to create session failure" });
+    }
+  });
+
+  app.get("/api/sessions/:accountId/failures", async (req, res) => {
+    try {
+      const { accountId } = req.params;
+      const failures = await storage.getSessionFailures(accountId);
+      res.json(failures);
+    } catch (error) {
+      console.error("Get session failures error:", error);
+      res.status(500).json({ message: "Failed to get session failures" });
+    }
+  });
+
+  app.get("/api/sessions/:accountId/health", async (req, res) => {
+    try {
+      const { accountId } = req.params;
+      const healthReport = await storage.getSessionHealthReport(accountId);
+      res.json(healthReport);
+    } catch (error) {
+      console.error("Get session health report error:", error);
+      res.status(500).json({ message: "Failed to get session health report" });
+    }
+  });
+
+  app.post("/api/sessions/failures/:failureId/resolve", async (req, res) => {
+    try {
+      const { failureId } = req.params;
+      await storage.markFailureResolved(failureId);
+      res.json({ success: true, message: "Failure marked as resolved" });
+    } catch (error) {
+      console.error("Mark failure resolved error:", error);
+      res.status(500).json({ message: "Failed to mark failure as resolved" });
+    }
+  });
+
+  // Phase 5: Re-Authentication Workflow
+  app.post("/api/auth/reauth", async (req, res) => {
+    try {
+      const validatedRequest = insertReauthRequestSchema.parse(req.body);
+      const reauthRequest = await storage.createReauthRequest(validatedRequest);
+      res.status(201).json(reauthRequest);
+    } catch (error) {
+      console.error("Create reauth request error:", error);
+      res.status(500).json({ message: "Failed to create reauth request" });
+    }
+  });
+
+  app.get("/api/auth/reauth/:requestId", async (req, res) => {
+    try {
+      const { requestId } = req.params;
+      const workflowStatus = await storage.getReauthWorkflowStatus(requestId);
+      if (!workflowStatus) {
+        return res.status(404).json({ message: "Reauth request not found" });
+      }
+      res.json(workflowStatus);
+    } catch (error) {
+      console.error("Get reauth workflow status error:", error);
+      res.status(500).json({ message: "Failed to get reauth workflow status" });
+    }
+  });
+
+  app.get("/api/auth/reauth/user/:userId", async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const activeRequests = await storage.getActiveReauthRequests(userId);
+      res.json(activeRequests);
+    } catch (error) {
+      console.error("Get active reauth requests error:", error);
+      res.status(500).json({ message: "Failed to get active reauth requests" });
+    }
+  });
+
+  // Phase 5: Account-specific Forwarding Mappings
+  app.get("/api/accounts/:accountId/mappings", async (req, res) => {
+    try {
+      const { accountId } = req.params;
+      const mappings = await storage.getAccountForwardingMappings(accountId);
+      res.json(mappings);
+    } catch (error) {
+      console.error("Get account forwarding mappings error:", error);
+      res.status(500).json({ message: "Failed to get account forwarding mappings" });
+    }
+  });
+
+  app.post("/api/accounts/:accountId/mappings", async (req, res) => {
+    try {
+      const { accountId } = req.params;
+      const validatedMapping = insertAccountForwardingMappingSchema.parse({
+        ...req.body,
+        accountId
+      });
+      const mapping = await storage.createAccountForwardingMapping(validatedMapping);
+      res.status(201).json(mapping);
+    } catch (error) {
+      console.error("Create account forwarding mapping error:", error);
+      res.status(500).json({ message: "Failed to create account forwarding mapping" });
+    }
+  });
+
+  app.delete("/api/accounts/mappings/:mappingId", async (req, res) => {
+    try {
+      const { mappingId } = req.params;
+      const deleted = await storage.deleteAccountForwardingMapping(mappingId);
+      if (!deleted) {
+        return res.status(404).json({ message: "Mapping not found" });
+      }
+      res.json({ success: true, message: "Mapping deleted successfully" });
+    } catch (error) {
+      console.error("Delete account forwarding mapping error:", error);
+      res.status(500).json({ message: "Failed to delete account forwarding mapping" });
+    }
+  });
+
+  // Phase 5: Session Backup & Recovery
+  app.post("/api/sessions/:accountId/backup", async (req, res) => {
+    try {
+      const { accountId } = req.params;
+      const validatedBackup = insertSessionBackupSchema.parse({
+        ...req.body,
+        accountId
+      });
+      const backup = await storage.createSessionBackup(validatedBackup);
+      res.status(201).json(backup);
+    } catch (error) {
+      console.error("Create session backup error:", error);
+      res.status(500).json({ message: "Failed to create session backup" });
+    }
+  });
+
+  app.get("/api/sessions/:accountId/backups", async (req, res) => {
+    try {
+      const { accountId } = req.params;
+      const backups = await storage.getSessionBackups(accountId);
+      res.json(backups);
+    } catch (error) {
+      console.error("Get session backups error:", error);
+      res.status(500).json({ message: "Failed to get session backups" });
+    }
+  });
+
+  app.post("/api/sessions/:accountId/restore/:backupId", async (req, res) => {
+    try {
+      const { accountId, backupId } = req.params;
+      await storage.restoreFromBackup(accountId, backupId);
+      res.json({ success: true, message: "Session restored from backup" });
+    } catch (error) {
+      console.error("Restore from backup error:", error);
+      res.status(500).json({ message: "Failed to restore from backup" });
+    }
+  });
+
+  // Phase 5: Real-time Sync Events
+  app.post("/api/sync/events", async (req, res) => {
+    try {
+      const validatedEvent = insertSyncEventSchema.parse(req.body);
+      const event = await storage.createSyncEvent(validatedEvent);
+      res.status(201).json(event);
+    } catch (error) {
+      console.error("Create sync event error:", error);
+      res.status(500).json({ message: "Failed to create sync event" });
+    }
+  });
+
+  app.get("/api/sync/events/unprocessed", async (req, res) => {
+    try {
+      const { userId } = req.query;
+      const events = await storage.getUnprocessedSyncEvents(userId as string);
+      res.json(events);
+    } catch (error) {
+      console.error("Get unprocessed sync events error:", error);
+      res.status(500).json({ message: "Failed to get unprocessed sync events" });
+    }
+  });
+
+  app.post("/api/sync/events/:eventId/process", async (req, res) => {
+    try {
+      const { eventId } = req.params;
+      await storage.markSyncEventProcessed(eventId);
+      res.json({ success: true, message: "Event marked as processed" });
+    } catch (error) {
+      console.error("Mark sync event processed error:", error);
+      res.status(500).json({ message: "Failed to mark event as processed" });
+    }
+  });
+
+  app.post("/api/sync/events/process/:userId", async (req, res) => {
+    try {
+      const { userId } = req.params;
+      await storage.processSyncEvents(userId);
+      res.json({ success: true, message: "All events processed" });
+    } catch (error) {
+      console.error("Process sync events error:", error);
+      res.status(500).json({ message: "Failed to process sync events" });
     }
   });
 

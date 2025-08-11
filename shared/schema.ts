@@ -748,3 +748,205 @@ export type QueueMetrics = {
     low: number;
   };
 };
+
+// Phase 5: Multi-Account Management
+export const telegramAccounts = pgTable("telegram_accounts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  accountName: text("account_name").notNull(), // User-friendly name
+  phoneNumber: text("phone_number").notNull(),
+  apiId: text("api_id").notNull(),
+  apiHash: text("api_hash").notNull(),
+  sessionPath: text("session_path").notNull(), // Path to session file
+  status: text("status").notNull().default("inactive"), // "active" | "inactive" | "reauth_required" | "failed" | "disconnected"
+  lastError: text("last_error"), // Last error message if any
+  lastActivity: timestamp("last_activity"),
+  isEnabled: boolean("is_enabled").notNull().default(true), // User can enable/disable forwarding
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+
+// Phase 5: Team/Workspace Collaboration (Elite Feature)
+export const teamMembers = pgTable("team_members", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ownerId: varchar("owner_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  memberId: varchar("member_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  permissions: text("permissions").notNull().default("read"), // "read" | "write"
+  status: text("status").notNull().default("pending"), // "pending" | "active" | "suspended"
+  invitedAt: timestamp("invited_at").notNull().default(sql`now()`),
+  joinedAt: timestamp("joined_at"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+// Phase 5: Enhanced Session Lifecycle & Error Handling
+export const sessionFailures = pgTable("session_failures", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  accountId: varchar("account_id").notNull().references(() => telegramAccounts.id, { onDelete: "cascade" }),
+  failureType: text("failure_type").notNull(), // "auth_error" | "flood_wait" | "network_error" | "crash" | "api_limit"
+  errorMessage: text("error_message").notNull(),
+  errorDetails: jsonb("error_details").default({}), // Additional error context
+  retryCount: integer("retry_count").notNull().default(0),
+  nextRetryAt: timestamp("next_retry_at"),
+  isResolved: boolean("is_resolved").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  resolvedAt: timestamp("resolved_at"),
+});
+
+// Phase 5: Session Re-Authentication Workflow
+export const reauthRequests = pgTable("reauth_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  accountId: varchar("account_id").notNull().references(() => telegramAccounts.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  requestType: text("request_type").notNull().default("session_expired"), // "session_expired" | "manual_reauth" | "security_check"
+  authToken: text("auth_token").notNull(), // Temporary token for re-auth process
+  expiresAt: timestamp("expires_at").notNull(),
+  status: text("status").notNull().default("pending"), // "pending" | "completed" | "expired" | "failed"
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+// Phase 5: Account-specific Forwarding Mappings
+export const accountForwardingMappings = pgTable("account_forwarding_mappings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  accountId: varchar("account_id").notNull().references(() => telegramAccounts.id, { onDelete: "cascade" }),
+  sourceId: varchar("source_id").notNull().references(() => sources.id, { onDelete: "cascade" }),
+  destinationId: varchar("destination_id").notNull().references(() => destinations.id, { onDelete: "cascade" }),
+  isActive: boolean("is_active").notNull().default(true),
+  priority: integer("priority").notNull().default(1),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+
+// Phase 5: Session Recovery & Backup
+export const sessionBackups = pgTable("session_backups", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  accountId: varchar("account_id").notNull().references(() => telegramAccounts.id, { onDelete: "cascade" }),
+  backupPath: text("backup_path").notNull(), // Path to .session.bak file
+  backupHash: text("backup_hash").notNull(), // File integrity check
+  backupSize: integer("backup_size").notNull(), // File size in bytes
+  isValid: boolean("is_valid").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+// Phase 5: Real-time Sync Events (for Dashboard-Bot sync)
+export const syncEvents = pgTable("sync_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  eventType: text("event_type").notNull(), // "source_added" | "destination_added" | "mapping_created" | "account_linked" | etc.
+  eventData: jsonb("event_data").notNull(), // Event payload
+  source: text("source").notNull(), // "dashboard" | "bot"
+  isProcessed: boolean("is_processed").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  processedAt: timestamp("processed_at"),
+});
+
+// Phase 5 Insert Schemas
+export const insertTelegramAccountSchema = createInsertSchema(telegramAccounts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertTeamMemberSchema = createInsertSchema(teamMembers).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertSessionFailureSchema = createInsertSchema(sessionFailures).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertReauthRequestSchema = createInsertSchema(reauthRequests).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertAccountForwardingMappingSchema = createInsertSchema(accountForwardingMappings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertSessionBackupSchema = createInsertSchema(sessionBackups).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertSyncEventSchema = createInsertSchema(syncEvents).omit({
+  id: true,
+  createdAt: true,
+});
+
+// Phase 5 Types
+export type InsertTelegramAccount = z.infer<typeof insertTelegramAccountSchema>;
+export type TelegramAccount = typeof telegramAccounts.$inferSelect;
+
+export type InsertTeamMember = z.infer<typeof insertTeamMemberSchema>;
+export type TeamMember = typeof teamMembers.$inferSelect;
+
+export type InsertSessionFailure = z.infer<typeof insertSessionFailureSchema>;
+export type SessionFailure = typeof sessionFailures.$inferSelect;
+
+export type InsertReauthRequest = z.infer<typeof insertReauthRequestSchema>;
+export type ReauthRequest = typeof reauthRequests.$inferSelect;
+
+export type InsertAccountForwardingMapping = z.infer<typeof insertAccountForwardingMappingSchema>;
+export type AccountForwardingMapping = typeof accountForwardingMappings.$inferSelect;
+
+export type InsertSessionBackup = z.infer<typeof insertSessionBackupSchema>;
+export type SessionBackup = typeof sessionBackups.$inferSelect;
+
+export type InsertSyncEvent = z.infer<typeof insertSyncEventSchema>;
+export type SyncEvent = typeof syncEvents.$inferSelect;
+
+// Phase 5 API Response types
+export type AccountStatusInfo = {
+  accountId: string;
+  accountName: string;
+  phoneNumber: string;
+  status: string;
+  lastError?: string;
+  lastActivity?: string;
+  isEnabled: boolean;
+  forwardingPairs: number;
+  totalMessages: number;
+};
+
+export type TeamInfo = {
+  ownerId: string;
+  members: {
+    memberId: string;
+    username: string;
+    email: string;
+    permissions: string;
+    status: string;
+    joinedAt?: string;
+  }[];
+  maxMembers: number;
+  currentMembers: number;
+};
+
+export type SessionHealthReport = {
+  accountId: string;
+  status: string;
+  lastError?: string;
+  retryCount: number;
+  nextRetryAt?: string;
+  uptime: number;
+  lastActivity?: string;
+  connectionQuality: "excellent" | "good" | "poor" | "critical";
+};
+
+export type ReauthWorkflowStatus = {
+  requestId: string;
+  accountId: string;
+  status: string;
+  authToken: string;
+  expiresAt: string;
+  steps: {
+    current: string;
+    completed: string[];
+    remaining: string[];
+  };
+};
