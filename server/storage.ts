@@ -17,7 +17,14 @@ import {
   type MessageDelaySetting, type InsertMessageDelaySetting,
   type PendingMessage, type InsertPendingMessage,
   type SystemStat, type InsertSystemStat,
-  type SystemStatsResponse, type PendingMessageWithDetails
+  type SystemStatsResponse, type PendingMessageWithDetails,
+  // Phase 4 imports
+  type SubscriptionPlan, type InsertSubscriptionPlan,
+  type ResourceTracking, type InsertResourceTracking,
+  type TaskQueue, type InsertTaskQueue,
+  type UserActivityLog, type InsertUserActivityLog,
+  type WorkerMetrics, type InsertWorkerMetrics,
+  type UserPlanDetails, type ResourceUsageReport, type QueueMetrics
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -137,6 +144,42 @@ export interface IStorage {
   createOrUpdateSystemStat(stat: InsertSystemStat): Promise<SystemStat>;
   getSystemStatsResponse(userId?: string): Promise<SystemStatsResponse>;
   incrementSystemStat(statType: string, period: string, field: string, amount?: number, userId?: string, mappingId?: string): Promise<void>;
+
+  // Phase 4: Subscription Plan Management
+  createSubscriptionPlan(plan: InsertSubscriptionPlan): Promise<SubscriptionPlan>;
+  getSubscriptionPlan(userId: string): Promise<SubscriptionPlan | null>;
+  updateSubscriptionPlan(userId: string, updates: Partial<SubscriptionPlan>): Promise<void>;
+  checkPlanLimits(userId: string, resourceType: 'sessions' | 'pairs'): Promise<boolean>;
+  incrementUsage(userId: string, resourceType: 'sessions' | 'pairs', amount?: number): Promise<void>;
+
+  // Phase 4: Resource Tracking
+  recordResourceUsage(usage: InsertResourceTracking): Promise<void>;
+  getResourceUsage(userId?: string, workerId?: string): Promise<ResourceTracking[]>;
+  pauseUserSessions(userId: string, reason: string): Promise<void>;
+  resumeUserSessions(userId: string): Promise<void>;
+  getHighRamUsers(thresholdBytes: number): Promise<ResourceUsageReport[]>;
+
+  // Phase 4: Task Queue Management
+  addTask(task: InsertTaskQueue): Promise<TaskQueue>;
+  getNextTask(workerId: string): Promise<TaskQueue | null>;
+  updateTaskStatus(taskId: string, status: string, errorMessage?: string): Promise<void>;
+  getQueueMetrics(): Promise<QueueMetrics>;
+  cleanupCompletedTasks(olderThanHours: number): Promise<void>;
+
+  // Phase 4: User Activity & Rate Limiting
+  logUserActivity(userId: string, activityType: string, endpoint?: string): Promise<void>;
+  checkRateLimit(userId: string, activityType: string): Promise<boolean>;
+  getUserActivityStats(userId: string, timeframe?: 'hourly' | 'daily'): Promise<UserActivityLog[]>;
+
+  // Phase 4: Worker Metrics & Scaling
+  updateWorkerMetrics(workerId: string, metrics: Partial<WorkerMetrics>): Promise<void>;
+  getWorkerMetrics(workerId?: string): Promise<WorkerMetrics[]>;
+  identifyScalingNeeds(): Promise<WorkerMetrics[]>;
+  
+  // Phase 4: Admin Operations
+  getAllUsersWithPlans(): Promise<(User & { plan?: SubscriptionPlan })[]>;
+  changeUserPlan(userId: string, newPlan: string): Promise<void>;
+  forceStopUserSessions(userId: string): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -161,11 +204,19 @@ export class MemStorage implements IStorage {
   private pendingMessages: Map<string, PendingMessage> = new Map();
   private systemStats: Map<string, SystemStat> = new Map();
 
+  // Phase 4 storage
+  private subscriptionPlans: Map<string, SubscriptionPlan> = new Map();
+  private resourceTracking: Map<string, ResourceTracking> = new Map();
+  private taskQueue: Map<string, TaskQueue> = new Map();
+  private userActivityLogs: Map<string, UserActivityLog> = new Map();
+  private workerMetrics: Map<string, WorkerMetrics> = new Map();
+
   constructor() {
     // Initialize with some default settings
     this.initializeDefaultSettings();
     this.initializeDefaultWorkers();
     this.initializeDefaultUser();
+    this.initializeDefaultSubscriptionPlans();
   }
 
   private initializeDefaultSettings() {
@@ -1007,6 +1058,345 @@ export class MemStorage implements IStorage {
     };
     this.systemStats.set(id, updatedStat);
     return updatedStat;
+  }
+
+  // Phase 4: Subscription Plan Management
+  async createSubscriptionPlan(plan: InsertSubscriptionPlan): Promise<SubscriptionPlan> {
+    const id = randomUUID();
+    const subscriptionPlan: SubscriptionPlan = {
+      ...plan,
+      id,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.subscriptionPlans.set(plan.userId, subscriptionPlan);
+    return subscriptionPlan;
+  }
+
+  async getSubscriptionPlan(userId: string): Promise<SubscriptionPlan | null> {
+    return this.subscriptionPlans.get(userId) || null;
+  }
+
+  async updateSubscriptionPlan(userId: string, updates: Partial<SubscriptionPlan>): Promise<void> {
+    const plan = this.subscriptionPlans.get(userId);
+    if (plan) {
+      const updatedPlan: SubscriptionPlan = {
+        ...plan,
+        ...updates,
+        updatedAt: new Date(),
+      };
+      this.subscriptionPlans.set(userId, updatedPlan);
+    }
+  }
+
+  async checkPlanLimits(userId: string, resourceType: 'sessions' | 'pairs'): Promise<boolean> {
+    const plan = await this.getSubscriptionPlan(userId);
+    if (!plan) return false;
+
+    if (resourceType === 'sessions') {
+      return plan.currentSessions < plan.maxSessions;
+    } else {
+      return plan.currentPairs < plan.maxForwardingPairs;
+    }
+  }
+
+  async incrementUsage(userId: string, resourceType: 'sessions' | 'pairs', amount = 1): Promise<void> {
+    const plan = this.subscriptionPlans.get(userId);
+    if (plan) {
+      const updates: Partial<SubscriptionPlan> = {};
+      if (resourceType === 'sessions') {
+        updates.currentSessions = Math.max(0, plan.currentSessions + amount);
+      } else {
+        updates.currentPairs = Math.max(0, plan.currentPairs + amount);
+      }
+      await this.updateSubscriptionPlan(userId, updates);
+    }
+  }
+
+  // Phase 4: Resource Tracking
+  async recordResourceUsage(usage: InsertResourceTracking): Promise<void> {
+    const id = randomUUID();
+    const resource: ResourceTracking = {
+      ...usage,
+      id,
+      createdAt: new Date(),
+    };
+    this.resourceTracking.set(id, resource);
+  }
+
+  async getResourceUsage(userId?: string, workerId?: string): Promise<ResourceTracking[]> {
+    const resources = Array.from(this.resourceTracking.values());
+    return resources.filter(r => 
+      (!userId || r.userId === userId) &&
+      (!workerId || r.workerId === workerId)
+    );
+  }
+
+  async pauseUserSessions(userId: string, reason: string): Promise<void> {
+    const resources = await this.getResourceUsage(userId);
+    for (const resource of resources) {
+      if (resource.id) {
+        const updated: ResourceTracking = {
+          ...resource,
+          isPaused: true,
+          lastActivity: new Date(),
+        };
+        this.resourceTracking.set(resource.id, updated);
+      }
+    }
+  }
+
+  async resumeUserSessions(userId: string): Promise<void> {
+    const resources = await this.getResourceUsage(userId);
+    for (const resource of resources) {
+      if (resource.id) {
+        const updated: ResourceTracking = {
+          ...resource,
+          isPaused: false,
+          lastActivity: new Date(),
+        };
+        this.resourceTracking.set(resource.id, updated);
+      }
+    }
+  }
+
+  async getHighRamUsers(thresholdBytes: number): Promise<ResourceUsageReport[]> {
+    const resources = Array.from(this.resourceTracking.values())
+      .filter(r => r.ramUsageBytes > thresholdBytes)
+      .map(r => ({
+        userId: r.userId || '',
+        sessionId: r.sessionId || undefined,
+        workerId: r.workerId || undefined,
+        ramUsageBytes: r.ramUsageBytes,
+        cpuUsagePercent: r.cpuUsagePercent,
+        messagesPerMinute: r.messagesPerMinute,
+        status: {
+          isActive: r.isActive,
+          isPaused: r.isPaused,
+        },
+        lastActivity: r.lastActivity.toISOString(),
+      }));
+    return resources;
+  }
+
+  // Phase 4: Task Queue Management
+  async addTask(task: InsertTaskQueue): Promise<TaskQueue> {
+    const id = randomUUID();
+    const queueTask: TaskQueue = {
+      ...task,
+      id,
+      createdAt: new Date(),
+    };
+    this.taskQueue.set(id, queueTask);
+    return queueTask;
+  }
+
+  async getNextTask(workerId: string): Promise<TaskQueue | null> {
+    const tasks = Array.from(this.taskQueue.values())
+      .filter(t => t.status === 'pending')
+      .sort((a, b) => b.priority - a.priority || a.scheduledFor.getTime() - b.scheduledFor.getTime());
+    
+    const nextTask = tasks[0];
+    if (nextTask) {
+      const updatedTask: TaskQueue = {
+        ...nextTask,
+        workerId: workerId,
+        status: 'processing',
+        startedAt: new Date(),
+      };
+      this.taskQueue.set(nextTask.id, updatedTask);
+      return updatedTask;
+    }
+    return null;
+  }
+
+  async updateTaskStatus(taskId: string, status: string, errorMessage?: string): Promise<void> {
+    const task = this.taskQueue.get(taskId);
+    if (task) {
+      const updatedTask: TaskQueue = {
+        ...task,
+        status,
+        errorMessage: errorMessage || task.errorMessage,
+        completedAt: (status === 'completed' || status === 'failed') ? new Date() : task.completedAt,
+      };
+      this.taskQueue.set(taskId, updatedTask);
+    }
+  }
+
+  async getQueueMetrics(): Promise<QueueMetrics> {
+    const tasks = Array.from(this.taskQueue.values());
+    const total = tasks.length;
+    const pending = tasks.filter(t => t.status === 'pending').length;
+    const processing = tasks.filter(t => t.status === 'processing').length;
+    const completed = tasks.filter(t => t.status === 'completed').length;
+    const failed = tasks.filter(t => t.status === 'failed').length;
+    const delayed = tasks.filter(t => t.status === 'delayed').length;
+
+    const completedTasks = tasks.filter(t => t.completedAt && t.startedAt);
+    const averageWaitTime = completedTasks.length > 0
+      ? completedTasks.reduce((sum, t) => sum + (t.startedAt!.getTime() - t.createdAt.getTime()), 0) / completedTasks.length
+      : 0;
+
+    const high = tasks.filter(t => t.priority >= 3).length;
+    const medium = tasks.filter(t => t.priority === 2).length;
+    const low = tasks.filter(t => t.priority <= 1).length;
+
+    return {
+      total, pending, processing, completed, failed, delayed,
+      averageWaitTime,
+      priorityBreakdown: { high, medium, low }
+    };
+  }
+
+  async cleanupCompletedTasks(olderThanHours: number): Promise<void> {
+    const cutoff = new Date(Date.now() - olderThanHours * 60 * 60 * 1000);
+    const tasksToDelete = Array.from(this.taskQueue.entries())
+      .filter(([, task]) => 
+        (task.status === 'completed' || task.status === 'failed') &&
+        task.completedAt && task.completedAt < cutoff
+      );
+    
+    for (const [id] of tasksToDelete) {
+      this.taskQueue.delete(id);
+    }
+  }
+
+  // Phase 4: User Activity & Rate Limiting
+  async logUserActivity(userId: string, activityType: string, endpoint?: string): Promise<void> {
+    const id = randomUUID();
+    const activity: UserActivityLog = {
+      id,
+      userId,
+      activityType,
+      endpoint: endpoint || null,
+      requestCount: 1,
+      windowStart: new Date(),
+      windowEnd: new Date(Date.now() + 60 * 60 * 1000), // 1 hour window
+      hourlyLimit: 100,
+      dailyLimit: 1000,
+      createdAt: new Date(),
+    };
+    this.userActivityLogs.set(id, activity);
+  }
+
+  async checkRateLimit(userId: string, activityType: string): Promise<boolean> {
+    const now = new Date();
+    const hourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+    const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+    const activities = Array.from(this.userActivityLogs.values())
+      .filter(a => a.userId === userId && a.activityType === activityType);
+
+    const hourlyCount = activities
+      .filter(a => a.createdAt >= hourAgo)
+      .reduce((sum, a) => sum + a.requestCount, 0);
+
+    const dailyCount = activities
+      .filter(a => a.createdAt >= dayAgo)
+      .reduce((sum, a) => sum + a.requestCount, 0);
+
+    const plan = await this.getSubscriptionPlan(userId);
+    const hourlyLimit = plan ? (plan.planType === 'elite' ? 500 : plan.planType === 'pro' ? 300 : 100) : 100;
+    const dailyLimit = plan ? (plan.planType === 'elite' ? 10000 : plan.planType === 'pro' ? 5000 : 1000) : 1000;
+
+    return hourlyCount < hourlyLimit && dailyCount < dailyLimit;
+  }
+
+  async getUserActivityStats(userId: string, timeframe: 'hourly' | 'daily' = 'hourly'): Promise<UserActivityLog[]> {
+    const now = new Date();
+    const cutoff = timeframe === 'hourly' 
+      ? new Date(now.getTime() - 60 * 60 * 1000)
+      : new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+    return Array.from(this.userActivityLogs.values())
+      .filter(a => a.userId === userId && a.createdAt >= cutoff);
+  }
+
+  // Phase 4: Worker Metrics & Scaling
+  async updateWorkerMetrics(workerId: string, metrics: Partial<WorkerMetrics>): Promise<void> {
+    const existing = this.workerMetrics.get(workerId);
+    const workerMetric: WorkerMetrics = {
+      id: existing?.id || randomUUID(),
+      workerId,
+      tasksCompleted: metrics.tasksCompleted || existing?.tasksCompleted || 0,
+      tasksInQueue: metrics.tasksInQueue || existing?.tasksInQueue || 0,
+      averageTaskTime: metrics.averageTaskTime || existing?.averageTaskTime || 0,
+      peakRamUsage: metrics.peakRamUsage || existing?.peakRamUsage || 0,
+      currentRamUsage: metrics.currentRamUsage || existing?.currentRamUsage || 0,
+      cpuLoad: metrics.cpuLoad || existing?.cpuLoad || 0,
+      sessionCapacity: metrics.sessionCapacity || existing?.sessionCapacity || 10,
+      currentSessions: metrics.currentSessions || existing?.currentSessions || 0,
+      isHealthy: metrics.isHealthy !== undefined ? metrics.isHealthy : (existing?.isHealthy || true),
+      needsScaling: metrics.needsScaling !== undefined ? metrics.needsScaling : (existing?.needsScaling || false),
+      timestamp: new Date(),
+    };
+    this.workerMetrics.set(workerId, workerMetric);
+  }
+
+  async getWorkerMetrics(workerId?: string): Promise<WorkerMetrics[]> {
+    const metrics = Array.from(this.workerMetrics.values());
+    return workerId ? metrics.filter(m => m.workerId === workerId) : metrics;
+  }
+
+  async identifyScalingNeeds(): Promise<WorkerMetrics[]> {
+    return Array.from(this.workerMetrics.values())
+      .filter(m => m.needsScaling || m.currentSessions >= m.sessionCapacity * 0.8);
+  }
+
+  // Phase 4: Admin Operations
+  async getAllUsersWithPlans(): Promise<(User & { plan?: SubscriptionPlan })[]> {
+    const users = Array.from(this.users.values());
+    const usersWithPlans = await Promise.all(
+      users.map(async user => {
+        const plan = await this.getSubscriptionPlan(user.id);
+        return { ...user, plan: plan || undefined };
+      })
+    );
+    return usersWithPlans;
+  }
+
+  async changeUserPlan(userId: string, newPlan: string): Promise<void> {
+    const planLimits = {
+      free: { maxSessions: 1, maxForwardingPairs: 5, priority: 1 },
+      pro: { maxSessions: 3, maxForwardingPairs: 999999, priority: 2 },
+      elite: { maxSessions: 5, maxForwardingPairs: 999999, priority: 3 }
+    };
+
+    const limits = planLimits[newPlan as keyof typeof planLimits] || planLimits.free;
+    
+    await this.updateSubscriptionPlan(userId, {
+      planType: newPlan,
+      ...limits,
+    });
+  }
+
+  async forceStopUserSessions(userId: string): Promise<void> {
+    await this.pauseUserSessions(userId, 'Admin forced stop');
+    await this.incrementUsage(userId, 'sessions', -999); // Reset session count
+  }
+
+  private initializeDefaultSubscriptionPlans() {
+    // Initialize subscription plans for existing users
+    for (const user of this.users.values()) {
+      if (!this.subscriptionPlans.has(user.id)) {
+        const defaultPlan: SubscriptionPlan = {
+          id: randomUUID(),
+          userId: user.id,
+          planType: 'free',
+          planStatus: 'active',
+          maxSessions: 1,
+          maxForwardingPairs: 5,
+          priority: 1,
+          startDate: new Date(),
+          expiryDate: null, // Free plans never expire
+          currentSessions: 0,
+          currentPairs: 0,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        this.subscriptionPlans.set(user.id, defaultPlan);
+      }
+    }
   }
 }
 

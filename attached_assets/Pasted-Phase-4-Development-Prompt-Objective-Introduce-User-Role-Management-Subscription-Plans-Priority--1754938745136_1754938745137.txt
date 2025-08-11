@@ -1,0 +1,153 @@
+Phase 4 Development Prompt
+
+Objective: Introduce User Role Management, Subscription Plans, Priority-Based Processing, and System Scalability Controls to support Free and Premium users with intelligent resource allocation.
+
+🧩 Key Goals of Phase 4:
+
+User Roles & Authentication
+
+Implement role-based access control (RBAC):
+
+Roles: admin, premium_user, free_user
+
+Define permissions:
+
+Admins: manage users, sessions, global settings
+
+Premium users: unlimited forwarding, high priority, more filters
+
+Free users: limited sessions/pairs, lower RAM priority, basic filters only
+
+Secure API routes and bot commands based on roles.
+
+Add user roles in DB with JWT-based authentication flow.
+
+Implement route guards in dashboard.
+
+Subscription Plan Handling
+
+Store user subscription type, expiration, and limits in DB.
+
+Plans:
+
+Free: 1 session, 5 pairs, low priority
+
+Pro: 3 sessions, unlimited pairs, high priority
+
+Elite: 5 sessions, multi-account, highest priority
+
+Bot Commands:
+
+/plan – show current plan
+
+/upgrade – show upgrade options (manual for now)
+
+Dashboard:
+
+Display plan details and usage stats
+
+Alert when limits are reached
+
+RAM-Aware Client Management
+
+Monitor RAM usage per session/client using psutil or built-in tracking.
+
+Keep connected clients in idle mode if they’re not actively forwarding.
+
+If RAM exceeds a threshold:
+
+Pause or delay free-user clients first.
+
+Prioritize premium sessions.
+
+Track and log memory per session and per worker.
+
+Priority Queue System for Forwarding Tasks
+
+Implement a simple task queue with prioritization (e.g., using Redis):
+
+Premium tasks go first, Free tasks are delayed if load is high
+
+Each worker:
+
+Pulls from the queue in priority order
+
+Reports when a task is delayed or rejected
+
+Track metrics:
+
+Average delay per tier
+
+Queue length and worker status
+
+Auto-Scaling Worker Infrastructure (Skeleton)
+
+Prepare architecture to allow horizontal scaling of workers
+
+If current worker is maxed:
+
+Send "spawn new worker" request (placeholder for now)
+
+Each worker has:
+
+unique ID
+
+session limit
+
+RAM cap
+
+Central dashboard shows active workers and assigned sessions
+
+Admin Tools
+
+Admin Dashboard (basic):
+
+See all users and their plan usage
+
+See active workers and resource stats
+
+Force stop or reassign session
+
+Admin Bot Commands:
+
+/users – list all users and roles
+
+/workers – list active workers
+
+/stats – show current usage by tier
+
+Logging & Rate Limiting
+
+Track:
+
+Sessions per user
+
+Pairs used
+
+Memory per user
+
+Set request/command limits for Free users
+
+Ensure logs are persistent and auto-rotate older logs
+
+📦 Deliverables for Phase 4
+
+Role-based user model
+
+Subscription system and plan enforcement
+
+RAM tracking with tiered processing logic
+
+Priority queue worker task system
+
+Admin dashboard and bot tools
+
+Logging and rate limiting per user plan
+
+✅ After this phase, the system should support:
+
+Multi-user management with plan-specific capabilities
+
+Intelligent memory control
+
+Ready-to-scale architecture with worker distribution logic

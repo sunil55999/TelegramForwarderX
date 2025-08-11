@@ -191,8 +191,8 @@ const Phase3Verification = () => {
     );
   }
   
-  const categories = report ? categorizeTests(report.results) : [];
-  const overallPassRate = report ? report.pass_rate : 0;
+  const categories = report ? categorizeTests((report as VerificationReport).results) : [];
+  const overallPassRate = report ? (report as VerificationReport).pass_rate : 0;
   
   return (
     <div className="container mx-auto p-6 space-y-6" data-testid="phase3-verification-page">
@@ -270,7 +270,7 @@ const Phase3Verification = () => {
                 {overallPassRate.toFixed(1)}%
               </div>
               <p className="text-xs text-muted-foreground">
-                {report.passed_tests} of {report.total_tests} tests passed
+                {report ? (report as VerificationReport).passed_tests : 0} of {report ? (report as VerificationReport).total_tests : 0} tests passed
               </p>
             </CardContent>
           </Card>
@@ -282,7 +282,7 @@ const Phase3Verification = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold" data-testid="text-total-tests">
-                {report.total_tests}
+                {report ? (report as VerificationReport).total_tests : 0}
               </div>
               <p className="text-xs text-muted-foreground">
                 Across {categories.length} categories
@@ -297,10 +297,10 @@ const Phase3Verification = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold" data-testid="text-execution-time">
-                {formatDuration(report.duration)}
+                {report ? formatDuration((report as VerificationReport).duration) : "0s"}
               </div>
               <p className="text-xs text-muted-foreground">
-                Last run: {formatTimestamp(report.timestamp)}
+                Last run: {report ? formatTimestamp((report as VerificationReport).timestamp) : "Never"}
               </p>
             </CardContent>
           </Card>
@@ -444,7 +444,7 @@ const Phase3Verification = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {report.results.map((result, index) => (
+                  {report && (report as VerificationReport).results.map((result: TestResult, index: number) => (
                     <div
                       key={index}
                       className={`p-4 rounded-lg border-l-4 ${

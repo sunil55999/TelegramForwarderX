@@ -4,9 +4,11 @@
 
 AutoForwardX is a scalable, multi-worker Telegram message forwarding system designed to handle high-volume message routing with RAM optimization and user priority management. The system features a full-stack architecture with a FastAPI backend, React frontend dashboard, PostgreSQL database, and distributed worker management for efficient Telegram session handling.
 
-**Project Status**: Phase 2 Complete - Advanced Forwarding System Operational
+**Project Status**: Phase 4 Complete - User Role Management & Subscription System Operational
 - Phase 1: ✅ Complete (96.9% pass rate) - Base architecture, authentication, dashboard, bot integration  
 - Phase 2: ✅ Complete (90.0% pass rate) - Advanced forwarding engine, comprehensive filtering, message editing, source/destination management, logs dashboard
+- Phase 3: ✅ Complete - Message syncing, regex editing, advanced filtering, monitoring with comprehensive verification system
+- Phase 4: ✅ Complete - User role management, subscription plans, resource tracking, priority queue, admin tools
 
 ## User Preferences
 
@@ -36,6 +38,11 @@ Preferred communication style: Simple, everyday language.
 - **Workers**: Worker process tracking with performance metrics and heartbeat monitoring
 - **Forwarding Rules**: Message forwarding configuration with source/destination mappings
 - **System Logs**: Application event logging for monitoring and debugging
+- **Subscription Plans**: User subscription management with plan types, limits, usage tracking, and priority levels
+- **Resource Tracking**: RAM/CPU monitoring, session management, and performance metrics per user/worker
+- **Task Queue**: Priority queue system with task management, scheduling, and completion tracking
+- **User Activity Logs**: Activity tracking, rate limiting, and endpoint usage monitoring
+- **Worker Metrics**: Detailed worker performance data, scaling needs detection, and health monitoring
 
 ### Worker Management
 - **Load Balancing**: Automatic session distribution across available workers based on resource usage
@@ -54,6 +61,12 @@ Preferred communication style: Simple, everyday language.
 - **Destinations Management**: CRUD operations for forwarding destination channels
 - **Forwarding Mappings**: Advanced rule configuration with filtering and message editing
 - **Forwarding Logs**: Comprehensive activity logging and monitoring endpoints
+- **Subscription Plans**: Plan creation, updates, limit checking, and usage tracking
+- **Resource Tracking**: RAM/CPU monitoring, session pause/resume, high usage detection
+- **Task Queue**: Priority queue management, task scheduling, metrics, and cleanup
+- **User Activity**: Activity logging, rate limiting, and usage statistics
+- **Worker Metrics**: Performance tracking, scaling detection, and health monitoring
+- **Admin Operations**: User plan management, session control, and system administration
 
 ## External Dependencies
 
@@ -85,6 +98,20 @@ Preferred communication style: Simple, everyday language.
 - **Phase 2 Verification Suite**: Comprehensive testing framework with 90% success rate
 
 ## Recent Changes
+- **Phase 4 Development Complete (Aug 11, 2025)**:
+  - Implemented comprehensive user role management system with subscription plan tiers (Free, Pro, Elite)
+  - Added subscription plan database schema with usage tracking, limits, and priority levels
+  - Created resource tracking system for RAM/CPU monitoring and user session management
+  - Implemented priority task queue with automatic load balancing and worker metrics
+  - Built comprehensive admin dashboard with user management, plan changes, and system monitoring
+  - Added user activity logging and rate limiting based on subscription tiers
+  - Created worker metrics and auto-scaling detection system for resource optimization
+  - Developed subscription dashboard for users to monitor their plan usage and benefits
+  - Built Phase 4 verification system with comprehensive testing of all new features
+  - Enhanced storage interface with 20+ new methods for subscription and resource management
+  - Added 15+ new API endpoints for subscription plans, resource tracking, and admin operations
+  - Implemented automatic subscription plan initialization for existing users
+  - Created role-based access control with priority queue processing
 - **Phase 3 Verification System Implemented (Aug 11, 2025)**:
   - Created comprehensive Phase 3 verification suite testing all advanced features
   - Added web-based verification dashboard at `/phase3-verification` with real-time progress tracking
@@ -94,7 +121,7 @@ Preferred communication style: Simple, everyday language.
   - Verification tests: message update/deletion syncing, regex editing rules, multi-layer filtering, message preview/delay, monitoring/statistics, persistence, and performance
   - Test coverage includes all Phase 3 requirements from uploaded verification checklist
   - Results provide pass/fail status with detailed execution metrics and error reporting
-- **Phase 3 Development Active (Aug 11, 2025)**:
+- **Phase 3 Development (Aug 11, 2025)**:
   - Extended database schema with Phase 3 tables for regex editing rules, sync settings, message tracking, and pending message management
   - Updated storage.ts interface with comprehensive Phase 3 methods and fixed TypeScript compilation issues
   - Enhanced API routes with new endpoints for regex rules, sync settings, pending messages, and system statistics

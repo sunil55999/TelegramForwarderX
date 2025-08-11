@@ -542,3 +542,209 @@ export type PendingMessageWithDetails = PendingMessage & {
   sourceTitle: string;
   destinationTitle: string;
 };
+
+// Phase 4: User Role Management & Subscription Plans
+export const subscriptionPlans = pgTable("subscription_plans", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  
+  planType: text("plan_type").notNull().default("free"), // "free" | "pro" | "elite"
+  planStatus: text("plan_status").notNull().default("active"), // "active" | "expired" | "cancelled"
+  
+  // Limits for the plan
+  maxSessions: integer("max_sessions").notNull().default(1),
+  maxForwardingPairs: integer("max_forwarding_pairs").notNull().default(5),
+  priority: integer("priority").notNull().default(1), // Higher = better priority
+  
+  // Subscription details
+  startDate: timestamp("start_date").notNull().default(sql`now()`),
+  expiryDate: timestamp("expiry_date"), // null = never expires for free plans
+  
+  // Current usage tracking
+  currentSessions: integer("current_sessions").notNull().default(0),
+  currentPairs: integer("current_pairs").notNull().default(0),
+  
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+
+// Phase 4: RAM and Resource Tracking
+export const resourceTracking = pgTable("resource_tracking", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }),
+  sessionId: varchar("session_id").references(() => telegramSessions.id, { onDelete: "cascade" }),
+  workerId: varchar("worker_id").references(() => workers.id, { onDelete: "cascade" }),
+  
+  // Resource usage metrics
+  ramUsageBytes: integer("ram_usage_bytes").notNull().default(0),
+  cpuUsagePercent: integer("cpu_usage_percent").notNull().default(0),
+  messagesPerMinute: integer("messages_per_minute").notNull().default(0),
+  
+  // Status tracking
+  isActive: boolean("is_active").notNull().default(true),
+  isPaused: boolean("is_paused").notNull().default(false), // For RAM management
+  lastActivity: timestamp("last_activity").notNull().default(sql`now()`),
+  
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+// Phase 4: Priority Task Queue
+export const taskQueue = pgTable("task_queue", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  sessionId: varchar("session_id").references(() => telegramSessions.id, { onDelete: "cascade" }),
+  workerId: varchar("worker_id").references(() => workers.id, { onDelete: "set null" }),
+  
+  taskType: text("task_type").notNull(), // "message_forward" | "message_edit" | "sync_update"
+  taskData: jsonb("task_data").notNull(), // Serialized task payload
+  
+  priority: integer("priority").notNull().default(1), // Based on user plan
+  status: text("status").notNull().default("pending"), // "pending" | "processing" | "completed" | "failed" | "delayed"
+  
+  scheduledFor: timestamp("scheduled_for").notNull().default(sql`now()`),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  
+  retryCount: integer("retry_count").notNull().default(0),
+  maxRetries: integer("max_retries").notNull().default(3),
+  errorMessage: text("error_message"),
+  
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+// Phase 4: User Activity & Rate Limiting
+export const userActivityLog = pgTable("user_activity_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  
+  activityType: text("activity_type").notNull(), // "api_request" | "bot_command" | "message_forward"
+  endpoint: text("endpoint"), // API endpoint or bot command
+  requestCount: integer("request_count").notNull().default(1),
+  
+  // Rate limiting tracking
+  windowStart: timestamp("window_start").notNull().default(sql`now()`),
+  windowEnd: timestamp("window_end").notNull().default(sql`now() + interval '1 hour'`),
+  
+  // Limits based on plan
+  hourlyLimit: integer("hourly_limit").notNull().default(100),
+  dailyLimit: integer("daily_limit").notNull().default(1000),
+  
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+// Phase 4: Worker Management & Scaling
+export const workerMetrics = pgTable("worker_metrics", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  workerId: varchar("worker_id").notNull().references(() => workers.id, { onDelete: "cascade" }),
+  
+  // Performance metrics
+  tasksCompleted: integer("tasks_completed").notNull().default(0),
+  tasksInQueue: integer("tasks_in_queue").notNull().default(0),
+  averageTaskTime: integer("average_task_time").notNull().default(0), // milliseconds
+  
+  // Resource metrics  
+  peakRamUsage: integer("peak_ram_usage").notNull().default(0),
+  currentRamUsage: integer("current_ram_usage").notNull().default(0),
+  cpuLoad: integer("cpu_load").notNull().default(0),
+  
+  // Capacity management
+  sessionCapacity: integer("session_capacity").notNull().default(10),
+  currentSessions: integer("current_sessions").notNull().default(0),
+  
+  // Status indicators
+  isHealthy: boolean("is_healthy").notNull().default(true),
+  needsScaling: boolean("needs_scaling").notNull().default(false),
+  
+  timestamp: timestamp("timestamp").notNull().default(sql`now()`),
+});
+
+// Phase 4 Insert Schemas
+export const insertSubscriptionPlanSchema = createInsertSchema(subscriptionPlans).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertResourceTrackingSchema = createInsertSchema(resourceTracking).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertTaskQueueSchema = createInsertSchema(taskQueue).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertUserActivityLogSchema = createInsertSchema(userActivityLog).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertWorkerMetricsSchema = createInsertSchema(workerMetrics).omit({
+  id: true,
+});
+
+// Phase 4 Types
+export type InsertSubscriptionPlan = z.infer<typeof insertSubscriptionPlanSchema>;
+export type SubscriptionPlan = typeof subscriptionPlans.$inferSelect;
+
+export type InsertResourceTracking = z.infer<typeof insertResourceTrackingSchema>;
+export type ResourceTracking = typeof resourceTracking.$inferSelect;
+
+export type InsertTaskQueue = z.infer<typeof insertTaskQueueSchema>;
+export type TaskQueue = typeof taskQueue.$inferSelect;
+
+export type InsertUserActivityLog = z.infer<typeof insertUserActivityLogSchema>;
+export type UserActivityLog = typeof userActivityLog.$inferSelect;
+
+export type InsertWorkerMetrics = z.infer<typeof insertWorkerMetricsSchema>;
+export type WorkerMetrics = typeof workerMetrics.$inferSelect;
+
+// Phase 4 API Response types
+export type UserPlanDetails = {
+  userId: string;
+  planType: string;
+  planStatus: string;
+  limits: {
+    maxSessions: number;
+    maxForwardingPairs: number;
+    priority: number;
+  };
+  usage: {
+    currentSessions: number;
+    currentPairs: number;
+  };
+  subscription: {
+    startDate: string;
+    expiryDate?: string;
+  };
+};
+
+export type ResourceUsageReport = {
+  userId: string;
+  sessionId?: string;
+  workerId?: string;
+  ramUsageBytes: number;
+  cpuUsagePercent: number;
+  messagesPerMinute: number;
+  status: {
+    isActive: boolean;
+    isPaused: boolean;
+  };
+  lastActivity: string;
+};
+
+export type QueueMetrics = {
+  total: number;
+  pending: number;
+  processing: number;
+  completed: number;
+  failed: number;
+  delayed: number;
+  averageWaitTime: number;
+  priorityBreakdown: {
+    high: number;
+    medium: number;
+    low: number;
+  };
+};

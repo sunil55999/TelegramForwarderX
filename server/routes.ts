@@ -841,6 +841,254 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Phase 4: User Role Management & Subscription Plans
+  app.get("/api/subscription-plans/:userId", async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const plan = await storage.getSubscriptionPlan(userId);
+      if (!plan) {
+        res.status(404).json({ message: "Subscription plan not found" });
+        return;
+      }
+      res.json(plan);
+    } catch (error) {
+      console.error("Get subscription plan error:", error);
+      res.status(500).json({ message: "Failed to get subscription plan" });
+    }
+  });
+
+  app.post("/api/subscription-plans", async (req, res) => {
+    try {
+      const plan = await storage.createSubscriptionPlan(req.body);
+      res.json(plan);
+    } catch (error) {
+      console.error("Create subscription plan error:", error);
+      res.status(500).json({ message: "Failed to create subscription plan" });
+    }
+  });
+
+  app.patch("/api/subscription-plans/:userId", async (req, res) => {
+    try {
+      const { userId } = req.params;
+      await storage.updateSubscriptionPlan(userId, req.body);
+      res.json({ success: true, message: "Subscription plan updated" });
+    } catch (error) {
+      console.error("Update subscription plan error:", error);
+      res.status(500).json({ message: "Failed to update subscription plan" });
+    }
+  });
+
+  app.post("/api/subscription-plans/:userId/check-limits", async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const { resourceType } = req.body;
+      const canUse = await storage.checkPlanLimits(userId, resourceType);
+      res.json({ canUse, resourceType });
+    } catch (error) {
+      console.error("Check plan limits error:", error);
+      res.status(500).json({ message: "Failed to check plan limits" });
+    }
+  });
+
+  // Phase 4: Resource Tracking & RAM Management
+  app.post("/api/resource-tracking", async (req, res) => {
+    try {
+      await storage.recordResourceUsage(req.body);
+      res.json({ success: true, message: "Resource usage recorded" });
+    } catch (error) {
+      console.error("Record resource usage error:", error);
+      res.status(500).json({ message: "Failed to record resource usage" });
+    }
+  });
+
+  app.get("/api/resource-tracking", async (req, res) => {
+    try {
+      const { userId, workerId } = req.query;
+      const usage = await storage.getResourceUsage(
+        userId as string, 
+        workerId as string
+      );
+      res.json(usage);
+    } catch (error) {
+      console.error("Get resource usage error:", error);
+      res.status(500).json({ message: "Failed to get resource usage" });
+    }
+  });
+
+  app.get("/api/resource-tracking/high-ram", async (req, res) => {
+    try {
+      const threshold = parseInt(req.query.threshold as string) || 512000000; // 512MB default
+      const highRamUsers = await storage.getHighRamUsers(threshold);
+      res.json(highRamUsers);
+    } catch (error) {
+      console.error("Get high RAM users error:", error);
+      res.status(500).json({ message: "Failed to get high RAM users" });
+    }
+  });
+
+  app.post("/api/users/:userId/pause-sessions", async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const { reason } = req.body;
+      await storage.pauseUserSessions(userId, reason || "System management");
+      res.json({ success: true, message: "User sessions paused" });
+    } catch (error) {
+      console.error("Pause user sessions error:", error);
+      res.status(500).json({ message: "Failed to pause user sessions" });
+    }
+  });
+
+  app.post("/api/users/:userId/resume-sessions", async (req, res) => {
+    try {
+      const { userId } = req.params;
+      await storage.resumeUserSessions(userId);
+      res.json({ success: true, message: "User sessions resumed" });
+    } catch (error) {
+      console.error("Resume user sessions error:", error);
+      res.status(500).json({ message: "Failed to resume user sessions" });
+    }
+  });
+
+  // Phase 4: Priority Task Queue Management
+  app.post("/api/task-queue", async (req, res) => {
+    try {
+      const task = await storage.addTask(req.body);
+      res.json(task);
+    } catch (error) {
+      console.error("Add task error:", error);
+      res.status(500).json({ message: "Failed to add task to queue" });
+    }
+  });
+
+  app.get("/api/task-queue/next/:workerId", async (req, res) => {
+    try {
+      const { workerId } = req.params;
+      const task = await storage.getNextTask(workerId);
+      if (!task) {
+        res.status(404).json({ message: "No tasks available" });
+        return;
+      }
+      res.json(task);
+    } catch (error) {
+      console.error("Get next task error:", error);
+      res.status(500).json({ message: "Failed to get next task" });
+    }
+  });
+
+  app.patch("/api/task-queue/:taskId", async (req, res) => {
+    try {
+      const { taskId } = req.params;
+      const { status, errorMessage } = req.body;
+      await storage.updateTaskStatus(taskId, status, errorMessage);
+      res.json({ success: true, message: "Task status updated" });
+    } catch (error) {
+      console.error("Update task status error:", error);
+      res.status(500).json({ message: "Failed to update task status" });
+    }
+  });
+
+  app.get("/api/task-queue/metrics", async (req, res) => {
+    try {
+      const metrics = await storage.getQueueMetrics();
+      res.json(metrics);
+    } catch (error) {
+      console.error("Get queue metrics error:", error);
+      res.status(500).json({ message: "Failed to get queue metrics" });
+    }
+  });
+
+  // Phase 4: User Activity & Rate Limiting
+  app.post("/api/user-activity/:userId", async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const { activityType, endpoint } = req.body;
+      await storage.logUserActivity(userId, activityType, endpoint);
+      res.json({ success: true, message: "Activity logged" });
+    } catch (error) {
+      console.error("Log user activity error:", error);
+      res.status(500).json({ message: "Failed to log user activity" });
+    }
+  });
+
+  app.get("/api/user-activity/:userId/check-rate-limit", async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const { activityType } = req.query;
+      const withinLimit = await storage.checkRateLimit(userId, activityType as string);
+      res.json({ withinLimit, userId, activityType });
+    } catch (error) {
+      console.error("Check rate limit error:", error);
+      res.status(500).json({ message: "Failed to check rate limit" });
+    }
+  });
+
+  // Phase 4: Worker Metrics & Auto-Scaling
+  app.post("/api/worker-metrics/:workerId", async (req, res) => {
+    try {
+      const { workerId } = req.params;
+      await storage.updateWorkerMetrics(workerId, req.body);
+      res.json({ success: true, message: "Worker metrics updated" });
+    } catch (error) {
+      console.error("Update worker metrics error:", error);
+      res.status(500).json({ message: "Failed to update worker metrics" });
+    }
+  });
+
+  app.get("/api/worker-metrics", async (req, res) => {
+    try {
+      const { workerId } = req.query;
+      const metrics = await storage.getWorkerMetrics(workerId as string);
+      res.json(metrics);
+    } catch (error) {
+      console.error("Get worker metrics error:", error);
+      res.status(500).json({ message: "Failed to get worker metrics" });
+    }
+  });
+
+  app.get("/api/worker-metrics/scaling-needs", async (req, res) => {
+    try {
+      const needsScaling = await storage.identifyScalingNeeds();
+      res.json(needsScaling);
+    } catch (error) {
+      console.error("Identify scaling needs error:", error);
+      res.status(500).json({ message: "Failed to identify scaling needs" });
+    }
+  });
+
+  // Phase 4: Admin Tools & User Management
+  app.get("/api/admin/users", async (req, res) => {
+    try {
+      const users = await storage.getAllUsersWithPlans();
+      res.json(users);
+    } catch (error) {
+      console.error("Get all users with plans error:", error);
+      res.status(500).json({ message: "Failed to get users with plans" });
+    }
+  });
+
+  app.post("/api/admin/users/:userId/change-plan", async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const { newPlan } = req.body;
+      await storage.changeUserPlan(userId, newPlan);
+      res.json({ success: true, message: `User plan changed to ${newPlan}` });
+    } catch (error) {
+      console.error("Change user plan error:", error);
+      res.status(500).json({ message: "Failed to change user plan" });
+    }
+  });
+
+  app.post("/api/admin/users/:userId/force-stop-sessions", async (req, res) => {
+    try {
+      const { userId } = req.params;
+      await storage.forceStopUserSessions(userId);
+      res.json({ success: true, message: "User sessions force stopped" });
+    } catch (error) {
+      console.error("Force stop user sessions error:", error);
+      res.status(500).json({ message: "Failed to force stop user sessions" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

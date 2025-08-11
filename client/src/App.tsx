@@ -19,6 +19,9 @@ import RegexRules from "@/pages/RegexRules";
 import PendingMessages from "@/pages/PendingMessages";
 import Statistics from "@/pages/Statistics";
 import Phase3Verification from "@/pages/Phase3Verification";
+import Phase4Verification from "@/pages/Phase4Verification";
+import AdminDashboard from "@/pages/AdminDashboard";
+import SubscriptionDashboard from "@/pages/SubscriptionDashboard";
 
 function Router() {
   return (
@@ -38,6 +41,9 @@ function Router() {
       <Route path="/pending-messages" component={PendingMessages} />
       <Route path="/statistics" component={Statistics} />
       <Route path="/phase3-verification" component={Phase3Verification} />
+      <Route path="/phase4-verification" component={Phase4Verification} />
+      <Route path="/subscription" component={SubscriptionDashboard} />
+      <Route path="/admin" component={AdminDashboard} />
       <Route component={NotFound} />
     </Switch>
   );
