@@ -1,0 +1,141 @@
+📦 Phase 5 Development Prompt — Multi-Account Management, Team Collaboration & Resilience
+
+Objective: Expand AutoForwardX to support multiple Telegram accounts per user, allow user teams to collaborate, and implement system-level fault tolerance with improved session lifecycle handling.
+
+🎯 Phase 5 Goals
+
+Multi-Account Management for Users
+
+Allow users to link multiple Telegram accounts under one dashboard login (Pro & Elite plans only).
+
+Store separate session files for each account.
+
+Users can:
+
+Assign different source-destination pairs to different accounts.
+
+Enable/disable forwarding per account.
+
+UI Update:
+
+Dashboard shows a list of linked accounts with session status.
+
+Bot: /accounts — lists connected accounts.
+
+Database Schema:
+
+users → user_id
+
+telegram_accounts → account_id, user_id (FK), session_path, status
+
+Team/Workspace Collaboration (Elite Feature)
+
+Users on the Elite plan can invite team members (max 3) to their dashboard.
+
+Team members can:
+
+Add/edit sources & destinations.
+
+View stats & logs.
+
+Cannot delete owner account or downgrade subscription.
+
+Dashboard:
+
+"Team" tab: Add/remove members, assign permissions (read/write).
+
+Bot: /team — view team members.
+
+Enhanced Session Lifecycle Handling
+
+Detect and automatically handle:
+
+Session crash or disconnect → auto-retry with exponential backoff.
+
+Re-authentication needed → mark session inactive, notify user via bot & dashboard.
+
+System should:
+
+Log session failures with cause (e.g., flood_wait, auth error).
+
+Alert user with exact issue and recovery steps.
+
+Build a session supervisor thread or service per worker.
+
+Session Re-Authentication Flow
+
+If Telegram logs out a session:
+
+Dashboard shows Reauth Required.
+
+Bot sends: "Your session was disconnected. Click here to re-authenticate."
+
+User can re-enter 2FA code or re-link via QR code or session code.
+
+New session replaces old file and links to same forwarding pairs.
+
+Bot & Dashboard Sync
+
+Dashboard and Telegram Bot should be fully in sync:
+
+Any update via one is reflected in the other in real-time.
+
+E.g., adding source in dashboard shows instantly in bot /sources.
+
+Use WebSocket or polling mechanism for two-way sync.
+
+Error Reporting & Crash Recovery
+
+Workers:
+
+Store last error per session.
+
+If crashed, auto-restart and reload previous session states.
+
+Main Server:
+
+Keeps list of failed sessions and allows admin to reassign to new worker.
+
+Bot command: /status shows last error per account.
+
+Log each recovery step with timestamp.
+
+Resilience Features
+
+Rate-limit retry logic to avoid hitting Telegram API limits.
+
+Implement exponential backoff on repeated errors.
+
+Redundant backups for session files (e.g., .session.bak).
+
+Auto-remove zombie sessions (disconnected for > X hours).
+
+Clean UX Enhancements
+
+Add color-coded status badges for session health: Active, Idle, Reauth Required, Failed.
+
+Auto-refresh dashboard every 10s for live updates.
+
+Add session history/log timeline per account.
+
+🚧 Developer Notes:
+
+Telethon clients must be isolated per session/account.
+
+Ensure session supervisor thread doesn’t overload CPU/RAM.
+
+Every update must be reflected both in bot and dashboard via real-time push or webhook.
+
+📌 Deliverables
+
+Multi-account linking (DB + UI + Bot)
+
+Team collaboration system (Elite)
+
+Fault-tolerant session management
+
+Real-time sync between bot & dashboard
+
+Full re-authentication workflow
+
+Logs and crash recovery engine
