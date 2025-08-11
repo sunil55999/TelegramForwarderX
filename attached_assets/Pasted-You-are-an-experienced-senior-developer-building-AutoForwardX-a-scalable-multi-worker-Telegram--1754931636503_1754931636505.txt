@@ -1,0 +1,61 @@
+You are an experienced senior developer building "AutoForwardX" — a scalable, multi-worker Telegram forwarding system with RAM optimization and free/premium user priority.
+
+Goals of this stage:
+1. Create the base backend in Python using FastAPI (for dashboard + API communication).
+2. Integrate Telethon for Telegram session handling.
+3. Implement database connection (PostgreSQL or MongoDB, pick the more efficient for session + settings storage).
+4. Create modular architecture for future feature additions.
+5. Implement worker-client architecture with Socket.IO or WebSocket for real-time communication between main server and worker servers.
+6. Handle RAM-efficient client session management, keeping clients connected but idle (no constant reconnections).
+7. Build a placeholder dashboard (HTML/JS) and Telegram bot structure for later integration.
+
+**Technical Requirements:**
+- Python 3.10+  
+- FastAPI for APIs & dashboard backend  
+- Telethon for Telegram handling  
+- PostgreSQL/MongoDB for data storage (select best for scaling & multiple concurrent sessions)  
+- Redis for caching and inter-process communication  
+- WebSocket or Socket.IO for main server <-> worker communication  
+- Modular folder structure:
+    - `/server` → main FastAPI + API routes  
+    - `/bot` → Telegram bot code  
+    - `/workers` → worker logic to forward messages, parse content, apply filters  
+    - `/db` → database models, migration scripts  
+    - `/utils` → helper functions (logging, RAM tracking, crash recovery)  
+- Config via `.env` file (main server/worker separation)
+- Implement error handling for:
+    - Session expired/re-authentication needed  
+    - Worker crash recovery & auto-restart  
+    - Telethon client crash auto-reconnect  
+- Keep free users low priority by delaying message forwarding if RAM is high.
+- Use asyncio tasks to run multiple sessions in parallel without blocking.
+
+**Initial API Endpoints to Implement:**
+- `/add_session` → Add Telegram session (via bot or dashboard)
+- `/list_sessions` → Get all active sessions (with RAM usage stats)
+- `/start_forwarding` → Assign a session to a worker
+- `/stop_forwarding` → Stop forwarding for a session
+- `/worker_status` → Check worker health
+- `/session_reauth` → Trigger re-login if session expired
+
+**Dashboard (basic HTML/JS placeholder for now):**
+- Login system (JWT-based, roles: Admin, User)
+- List sessions with status (connected/idle/crashed)
+- Start/Stop forwarding buttons
+- Basic RAM usage monitor
+
+**Telegram Bot (placeholder for now):**
+- `/start` → Welcome message + authentication
+- `/addsession` → Start session linking flow
+- `/status` → Show active sessions & workers
+- `/stop` → Stop session forwarding
+
+Deliverables for this stage:
+- Fully structured project folders
+- Working FastAPI server
+- Database connection working
+- WebSocket communication between main server and a dummy worker
+- Session connect/disconnect test with Telethon
+- Dashboard placeholder page
+- Bot skeleton code
+- Logging & crash recovery skeleton
