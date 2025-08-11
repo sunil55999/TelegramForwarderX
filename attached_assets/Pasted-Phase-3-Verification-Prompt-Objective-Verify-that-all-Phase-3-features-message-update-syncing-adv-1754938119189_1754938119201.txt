@@ -1,0 +1,107 @@
+Phase 3 Verification Prompt
+
+Objective: Verify that all Phase 3 features—message update syncing, advanced editing, deletion syncing, preview delay, and monitoring—are implemented correctly, perform reliably, and persist after restart.
+
+Verification Checklist
+
+Message Update Syncing
+
+Action: Send a message in a source channel, allow it to be forwarded.
+
+Edit the message in the source.
+
+Expected Result: The edited message should be updated in all destination channels within 5 seconds.
+
+Confirm formatting remains intact and only content is modified.
+
+Message Deletion Syncing
+
+Action: Delete a previously forwarded message from the source.
+
+Expected Result: The corresponding messages in the destination channels are deleted automatically.
+
+Test toggle: Turn this feature off via /syncdeletes off, delete a message again, and confirm the destinations retain it.
+
+Advanced Editing Rules (Regex)
+
+Action: Create regex rule: replace buy with BUY 🚀.
+
+Send message: Time to buy now!
+
+Expected Result: Destination shows: Time to BUY 🚀 now!
+
+Add multiple rules and test chained replacements.
+
+Confirm rules are listed via /listeditrules and removable via /removeeditrule.
+
+Multi-Layer Filtering
+
+Action: Set keyword filter to forex and message type filter to text.
+
+Send a text message with forex → should forward.
+
+Send an image message with forex → should NOT forward.
+
+Send a text message without forex → should NOT forward.
+
+Message Preview & Delay
+
+Action: Set delay to 30 seconds via /setdelay 30.
+
+Enable approval mode.
+
+Send a message.
+
+Expected Result: Bot notifies admin: Approve or Reject?
+
+Approve: message is forwarded after 30 seconds.
+
+Reject: message is discarded.
+
+Confirm the correct result is logged and stats are updated.
+
+Monitoring & Statistics
+
+Action: Run /stats.
+
+Expected Output: Display:
+
+Messages processed (hour/day)
+
+Messages forwarded
+
+Messages filtered/skipped
+
+Messages deleted
+
+Errors (e.g., failed forwarding)
+
+Confirm dashboard shows same info in visual form.
+
+Persistence Test
+
+Restart all services (main server + worker).
+
+Run /listeditrules, /syncupdates, /syncdeletes, /setdelay, and /stats again.
+
+Confirm all settings and message history remain intact.
+
+Performance Check
+
+Send 20 messages in 10 seconds.
+
+Confirm updates, deletions, filters, edits, and delays do not cause backlog or timeouts.
+
+RAM usage on worker remains within limits.
+
+Log Requirements
+
+For each test, log:
+
+Input message or action.
+
+Output result or forwarded content.
+
+Pass/Fail.
+
+Screenshot/log excerpt if possible.
