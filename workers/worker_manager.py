@@ -523,7 +523,7 @@ class WorkerManager:
                 )
                 
                 messages_diff = current_messages - last_message_count
-                self.performance_stats["messages_per_second"] = messages_diff / 60
+                self.performance_stats["messages_per_second"] = int(messages_diff / 60)
                 self.performance_stats["total_messages"] = current_messages
                 self.performance_stats["active_sessions"] = len(self.session_assignments)
                 

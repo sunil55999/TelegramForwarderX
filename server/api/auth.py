@@ -51,7 +51,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
             
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expired")
-    except jwt.JWTError:
+    except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
