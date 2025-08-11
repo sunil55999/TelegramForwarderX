@@ -1,0 +1,84 @@
+Develop Phase 3 of AutoForwardX according to the system roadmap.
+
+Objective:
+Extend the basic forwarding engine with Advanced Editing, Monitoring, and Update Handling features. Ensure these features are fully configurable via the admin interface and persist after restarts.
+
+Phase 3 Features to Implement:
+
+Message Update Syncing
+
+If a message in the source is edited, automatically update the forwarded copies in all destinations.
+
+Updates must be applied within 5 seconds of detection.
+
+Maintain original forwarded formatting while applying the updated content.
+
+Message Deletion Syncing
+
+If a message is deleted from the source, delete it from all destinations (configurable on/off).
+
+Advanced Editing Rules
+
+Support regex-based find/replace before forwarding.
+
+Example: Replace buy with BUY 🚀 in all forwarded messages.
+
+Allow multiple regex rules to run in sequence.
+
+Multi-Layer Filtering
+
+Combine keyword filtering with message type filtering.
+
+Example: Forward only text messages containing forex.
+
+Message Preview & Delay
+
+Add an option to delay forwarding by a set time (e.g., 5–60 seconds).
+
+Optionally allow admin to approve/reject messages during this delay (via inline buttons).
+
+Channel/Group Monitoring Dashboard
+
+Show live status:
+
+Number of messages processed in last hour/day.
+
+Number forwarded, filtered, blocked.
+
+Error counts.
+
+Display as a Telegram admin panel command (/stats).
+
+Admin Commands for Phase 3 Features
+
+/seteditrule — Add regex replacement rule.
+
+/listeditrules — Show all rules.
+
+/removeeditrule — Delete a rule.
+
+/syncupdates on|off — Enable/disable update syncing.
+
+/syncdeletes on|off — Enable/disable deletion syncing.
+
+/setdelay — Set forwarding delay in seconds.
+
+/approve / /reject — Approve or reject delayed messages.
+
+/stats — Show system stats.
+
+Persistent Storage Upgrade
+
+Store all regex rules, sync settings, delay time, and stats in persistent storage.
+
+Ensure no loss of data after restart.
+
+Development Notes:
+
+Maintain clean modular code: separate message handling, filtering, and storage logic.
+
+Optimize so added features do not cause delays in normal forwarding.
+
+All changes must be backward-compatible with Phase 2.
+
+Log all message updates, deletions, and approval actions.
