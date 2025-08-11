@@ -1,0 +1,143 @@
+AutoForwardX – Phase 1 Development Prompt
+Goal:
+Set up the core base architecture for AutoForwardX, ensuring a scalable foundation for future phases. This phase will focus on project structure, essential dependencies, session management, and initial communication between main server and workers.
+
+Requirements for Phase 1
+1. Project Structure Setup
+Create a modular folder structure:
+
+bash
+Copy
+Edit
+AutoForwardX/
+  ├── server/             # Main server logic
+  │   ├── api/             # REST API endpoints
+  │   ├── models/          # Database models
+  │   ├── services/        # Core services like user/session mgmt
+  │   ├── utils/           # Helpers, loggers, constants
+  │   └── main.py          # Main entry point
+  ├── workers/             # Worker service logic
+  │   ├── worker_manager.py
+  │   ├── telethon_worker.py
+  │   └── utils/
+  ├── dashboard/           # Frontend (can be React/Vue)
+  ├── bot/                 # Telegram bot logic
+  │   ├── handlers/
+  │   ├── commands/
+  │   └── bot_main.py
+  ├── config/              # Configs (env variables, constants)
+  ├── scripts/             # Setup and deployment scripts
+  ├── tests/               # Unit and integration tests
+  └── requirements.txt
+2. Environment & Config Management
+Use .env for sensitive configs:
+
+Database connection
+
+Telegram API ID & Hash
+
+JWT secret key
+
+Worker auth keys
+
+Implement a Config Loader (config/config.py) that reads from .env and validates required fields.
+
+3. Database Setup
+Use PostgreSQL for main data storage.
+
+Create tables for:
+
+users
+
+sessions (stores Telethon session paths & status)
+
+subscriptions (plan type, expiry)
+
+workers (worker nodes metadata & status)
+
+Add migrations (Alembic or Prisma depending on Python/Node choice).
+
+4. Base API for Communication
+REST API with FastAPI or Flask in server/api.
+
+Endpoints:
+
+POST /auth/login
+
+POST /auth/register
+
+GET /session/status/{user_id}
+
+POST /session/start
+
+POST /session/stop
+
+GET /worker/status
+
+Use JWT authentication.
+
+5. Worker Server Architecture
+Worker service can run standalone on another VPS.
+
+Worker responsibilities in Phase 1:
+
+Receive session start/stop instructions from main server.
+
+Report current RAM usage & connected sessions.
+
+Use WebSocket for real-time updates between main server & workers.
+
+Implement a worker heartbeat system to detect crashes.
+
+6. Basic Telethon Integration
+Set up Telethon in workers/telethon_worker.py.
+
+Able to:
+
+Connect to a user session.
+
+Fetch basic account info (username, name, session validity).
+
+Store session .session files in a shared storage folder accessible by workers.
+
+7. Error Handling
+Graceful handling for:
+
+Worker crash
+
+Session re-auth requirement
+
+Main server losing connection to worker
+
+Logging to file + console with timestamps.
+
+8. Testing
+Write basic tests for:
+
+API routes returning correct responses.
+
+Worker connection & heartbeat.
+
+Telethon session start/stop flow.
+
+Deliverables for Phase 1
+Fully running base project with:
+
+Main server
+
+One worker instance
+
+Working session start/stop
+
+Dashboard placeholder page (just “Connected” status)
+
+All services containerized with Docker.
+
+Clear README.md with:
+
+How to run locally
+
+How to start a worker
+
+How to connect worker to main server
+
