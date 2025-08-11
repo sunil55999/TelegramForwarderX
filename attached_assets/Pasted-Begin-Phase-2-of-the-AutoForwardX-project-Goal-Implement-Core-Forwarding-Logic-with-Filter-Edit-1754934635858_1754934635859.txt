@@ -1,0 +1,75 @@
+Begin Phase 2 of the AutoForwardX project.
+
+Goal: Implement Core Forwarding Logic with Filter & Edit Features so that messages from monitored channels/groups are captured, processed, and forwarded according to user-defined rules.
+
+Phase 2 Requirements:
+
+Source & Destination Management
+
+API endpoints and dashboard UI for:
+
+Adding source channels/groups.
+
+Adding destination channels/groups.
+
+Linking multiple sources to multiple destinations (many-to-many mapping).
+
+Bot commands for listing sources/destinations for quick checks.
+
+Forwarding Engine (Base Version)
+
+Worker continuously monitors assigned Telegram sources.
+
+When a new message arrives, it is processed and sent to linked destinations.
+
+Handles text, images, videos, and documents.
+
+Maintains original formatting where possible.
+
+Basic Filters
+
+Keyword-based filtering (include/exclude lists).
+
+Message type filter (e.g., text-only, media-only).
+
+Option to skip messages containing URLs.
+
+Basic Editing
+
+Ability to add header/footer text to forwarded messages.
+
+Option to remove sender usernames from forwarded messages.
+
+Option to strip URLs from message body.
+
+Configuration & Persistence
+
+User-specific forwarding settings stored in DB.
+
+Changes to filters or destinations apply without restarting the worker.
+
+Session & mapping configurations survive server restarts.
+
+Testing & Debugging Tools
+
+Test mode: simulate forwarding without sending to Telegram, log processed messages.
+
+Real-time log streaming to dashboard (forwarding events & errors).
+
+Error handling for cases like bot removed from channel, message too large, media download failed, etc.
+
+Verification Checklist for Phase 2:
+
+Add a source & destination, send a test message in source, confirm correct forwarding to destination.
+
+Apply keyword filter and confirm that non-matching messages are skipped.
+
+Enable URL removal and confirm forwarded message has no URLs.
+
+Add header/footer and confirm it appears in forwarded message.
+
+Restart system and confirm settings remain intact.
+
+Run test mode and confirm processed messages appear in logs without sending.
+
+Once complete, prepare a detailed test log showing each feature working with example input/output.

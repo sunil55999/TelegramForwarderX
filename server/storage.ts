@@ -1,4 +1,16 @@
-import { type User, type InsertUser, type TelegramSession, type InsertTelegramSession, type Worker, type InsertWorker, type ForwardingRule, type InsertForwardingRule, type SystemLog, type InsertSystemLog, type SystemSetting, type InsertSystemSetting, type DashboardStats, type SystemHealth, type ActivityItem } from "@shared/schema";
+import { 
+  type User, type InsertUser, 
+  type TelegramSession, type InsertTelegramSession, 
+  type Worker, type InsertWorker, 
+  type ForwardingRule, type InsertForwardingRule, 
+  type SystemLog, type InsertSystemLog, 
+  type SystemSetting, type InsertSystemSetting, 
+  type Source, type InsertSource,
+  type Destination, type InsertDestination,
+  type ForwardingMapping, type InsertForwardingMapping,
+  type ForwardingLog, type InsertForwardingLog,
+  type DashboardStats, type SystemHealth, type ActivityItem 
+} from "@shared/schema";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
@@ -42,6 +54,28 @@ export interface IStorage {
   createOrUpdateSystemSetting(setting: InsertSystemSetting): Promise<SystemSetting>;
   getAllSystemSettings(): Promise<SystemSetting[]>;
 
+  // Phase 2: Sources
+  getSource(id: string): Promise<Source | undefined>;
+  createSource(source: InsertSource): Promise<Source>;
+  deleteSource(id: string): Promise<boolean>;
+  getAllSources(): Promise<Source[]>;
+
+  // Phase 2: Destinations
+  getDestination(id: string): Promise<Destination | undefined>;
+  createDestination(destination: InsertDestination): Promise<Destination>;
+  deleteDestination(id: string): Promise<boolean>;
+  getAllDestinations(): Promise<Destination[]>;
+
+  // Phase 2: Forwarding Mappings
+  getForwardingMapping(id: string): Promise<ForwardingMapping | undefined>;
+  createForwardingMapping(mapping: InsertForwardingMapping): Promise<ForwardingMapping>;
+  deleteForwardingMapping(id: string): Promise<boolean>;
+  getAllForwardingMappings(): Promise<ForwardingMapping[]>;
+
+  // Phase 2: Forwarding Logs
+  createForwardingLog(log: InsertForwardingLog): Promise<ForwardingLog>;
+  getForwardingLogs(limit?: number, offset?: number, status?: string): Promise<ForwardingLog[]>;
+
   // Dashboard data
   getDashboardStats(): Promise<DashboardStats>;
   getSystemHealth(): Promise<SystemHealth>;
@@ -55,6 +89,12 @@ export class MemStorage implements IStorage {
   private forwardingRules: Map<string, ForwardingRule> = new Map();
   private systemLogs: Map<string, SystemLog> = new Map();
   private systemSettings: Map<string, SystemSetting> = new Map();
+  
+  // Phase 2 storage
+  private sources: Map<string, Source> = new Map();
+  private destinations: Map<string, Destination> = new Map();
+  private forwardingMappings: Map<string, ForwardingMapping> = new Map();
+  private forwardingLogs: Map<string, ForwardingLog> = new Map();
 
   constructor() {
     // Initialize with some default settings
@@ -370,6 +410,112 @@ export class MemStorage implements IStorage {
       timestamp: log.createdAt.toISOString(),
       component: log.component,
     }));
+  }
+
+  // Phase 2: Sources methods
+  async getSource(id: string): Promise<Source | undefined> {
+    return this.sources.get(id);
+  }
+
+  async createSource(insertSource: InsertSource): Promise<Source> {
+    const id = randomUUID();
+    const source: Source = {
+      ...insertSource,
+      id,
+      isActive: insertSource.isActive ?? true,
+      lastMessageTime: insertSource.lastMessageTime || null,
+      totalMessages: insertSource.totalMessages || 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.sources.set(id, source);
+    return source;
+  }
+
+  async deleteSource(id: string): Promise<boolean> {
+    return this.sources.delete(id);
+  }
+
+  async getAllSources(): Promise<Source[]> {
+    return Array.from(this.sources.values());
+  }
+
+  // Phase 2: Destinations methods
+  async getDestination(id: string): Promise<Destination | undefined> {
+    return this.destinations.get(id);
+  }
+
+  async createDestination(insertDestination: InsertDestination): Promise<Destination> {
+    const id = randomUUID();
+    const destination: Destination = {
+      ...insertDestination,
+      id,
+      isActive: insertDestination.isActive ?? true,
+      lastForwardTime: insertDestination.lastForwardTime || null,
+      totalForwarded: insertDestination.totalForwarded || 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.destinations.set(id, destination);
+    return destination;
+  }
+
+  async deleteDestination(id: string): Promise<boolean> {
+    return this.destinations.delete(id);
+  }
+
+  async getAllDestinations(): Promise<Destination[]> {
+    return Array.from(this.destinations.values());
+  }
+
+  // Phase 2: Forwarding Mappings methods
+  async getForwardingMapping(id: string): Promise<ForwardingMapping | undefined> {
+    return this.forwardingMappings.get(id);
+  }
+
+  async createForwardingMapping(insertMapping: InsertForwardingMapping): Promise<ForwardingMapping> {
+    const id = randomUUID();
+    const mapping: ForwardingMapping = {
+      ...insertMapping,
+      id,
+      isActive: insertMapping.isActive ?? true,
+      priority: insertMapping.priority || 1,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.forwardingMappings.set(id, mapping);
+    return mapping;
+  }
+
+  async deleteForwardingMapping(id: string): Promise<boolean> {
+    return this.forwardingMappings.delete(id);
+  }
+
+  async getAllForwardingMappings(): Promise<ForwardingMapping[]> {
+    return Array.from(this.forwardingMappings.values());
+  }
+
+  // Phase 2: Forwarding Logs methods
+  async createForwardingLog(insertLog: InsertForwardingLog): Promise<ForwardingLog> {
+    const id = randomUUID();
+    const log: ForwardingLog = {
+      ...insertLog,
+      id,
+      createdAt: new Date(),
+    };
+    this.forwardingLogs.set(id, log);
+    return log;
+  }
+
+  async getForwardingLogs(limit = 50, offset = 0, status?: string): Promise<ForwardingLog[]> {
+    let logs = Array.from(this.forwardingLogs.values())
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    
+    if (status) {
+      logs = logs.filter(log => log.status === status);
+    }
+    
+    return logs.slice(offset, offset + limit);
   }
 }
 

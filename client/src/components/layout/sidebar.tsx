@@ -37,6 +37,24 @@ export default function DashboardLayout({ children }: SidebarProps) {
       testId: "nav-sessions"
     },
     {
+      name: "Sources",
+      path: "/sources",
+      icon: "fas fa-inbox",
+      testId: "nav-sources"
+    },
+    {
+      name: "Destinations",
+      path: "/destinations",
+      icon: "fas fa-paper-plane",
+      testId: "nav-destinations"
+    },
+    {
+      name: "Forwarding",
+      path: "/forwarding",
+      icon: "fas fa-route",
+      testId: "nav-forwarding"
+    },
+    {
       name: "Workers",
       path: "/workers",
       icon: "fas fa-cogs",

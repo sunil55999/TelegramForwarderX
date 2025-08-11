@@ -2,7 +2,14 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { z } from "zod";
-import { insertUserSchema, insertTelegramSessionSchema, insertWorkerSchema } from "@shared/schema";
+import { 
+  insertUserSchema, 
+  insertTelegramSessionSchema, 
+  insertWorkerSchema,
+  insertSourceSchema,
+  insertDestinationSchema,
+  insertForwardingMappingSchema
+} from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth endpoints
@@ -278,6 +285,145 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Settings update error:", error);
       res.status(500).json({ message: "Failed to update setting" });
+    }
+  });
+
+  // Phase 2: Sources endpoints
+  app.get("/api/sources", async (req, res) => {
+    try {
+      const sources = await storage.getAllSources();
+      res.json(sources);
+    } catch (error) {
+      console.error("Sources fetch error:", error);
+      res.status(500).json({ message: "Failed to fetch sources" });
+    }
+  });
+
+  app.post("/api/sources", async (req, res) => {
+    try {
+      const sourceData = insertSourceSchema.parse(req.body);
+      const source = await storage.createSource(sourceData);
+      res.status(201).json(source);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid source data", errors: error.errors });
+      }
+      console.error("Source creation error:", error);
+      res.status(500).json({ message: "Failed to create source" });
+    }
+  });
+
+  app.delete("/api/sources/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteSource(id);
+      
+      if (!deleted) {
+        return res.status(404).json({ message: "Source not found" });
+      }
+      
+      res.json({ message: "Source deleted successfully" });
+    } catch (error) {
+      console.error("Source deletion error:", error);
+      res.status(500).json({ message: "Failed to delete source" });
+    }
+  });
+
+  // Phase 2: Destinations endpoints
+  app.get("/api/destinations", async (req, res) => {
+    try {
+      const destinations = await storage.getAllDestinations();
+      res.json(destinations);
+    } catch (error) {
+      console.error("Destinations fetch error:", error);
+      res.status(500).json({ message: "Failed to fetch destinations" });
+    }
+  });
+
+  app.post("/api/destinations", async (req, res) => {
+    try {
+      const destinationData = insertDestinationSchema.parse(req.body);
+      const destination = await storage.createDestination(destinationData);
+      res.status(201).json(destination);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid destination data", errors: error.errors });
+      }
+      console.error("Destination creation error:", error);
+      res.status(500).json({ message: "Failed to create destination" });
+    }
+  });
+
+  app.delete("/api/destinations/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteDestination(id);
+      
+      if (!deleted) {
+        return res.status(404).json({ message: "Destination not found" });
+      }
+      
+      res.json({ message: "Destination deleted successfully" });
+    } catch (error) {
+      console.error("Destination deletion error:", error);
+      res.status(500).json({ message: "Failed to delete destination" });
+    }
+  });
+
+  // Phase 2: Forwarding mappings endpoints
+  app.get("/api/forwarding/mappings", async (req, res) => {
+    try {
+      const mappings = await storage.getAllForwardingMappings();
+      res.json(mappings);
+    } catch (error) {
+      console.error("Mappings fetch error:", error);
+      res.status(500).json({ message: "Failed to fetch mappings" });
+    }
+  });
+
+  app.post("/api/forwarding/mappings", async (req, res) => {
+    try {
+      const mappingData = insertForwardingMappingSchema.parse(req.body);
+      const mapping = await storage.createForwardingMapping(mappingData);
+      res.status(201).json(mapping);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid mapping data", errors: error.errors });
+      }
+      console.error("Mapping creation error:", error);
+      res.status(500).json({ message: "Failed to create mapping" });
+    }
+  });
+
+  app.delete("/api/forwarding/mappings/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteForwardingMapping(id);
+      
+      if (!deleted) {
+        return res.status(404).json({ message: "Mapping not found" });
+      }
+      
+      res.json({ message: "Mapping deleted successfully" });
+    } catch (error) {
+      console.error("Mapping deletion error:", error);
+      res.status(500).json({ message: "Failed to delete mapping" });
+    }
+  });
+
+  // Phase 2: Forwarding logs endpoints
+  app.get("/api/forwarding/logs", async (req, res) => {
+    try {
+      const { limit = 50, offset = 0, status } = req.query;
+      const logs = await storage.getForwardingLogs(
+        parseInt(limit as string), 
+        parseInt(offset as string),
+        status as string
+      );
+      res.json(logs);
+    } catch (error) {
+      console.error("Logs fetch error:", error);
+      res.status(500).json({ message: "Failed to fetch logs" });
     }
   });
 

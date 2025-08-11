@@ -9,6 +9,9 @@ import Sessions from "@/pages/sessions";
 import Workers from "@/pages/workers";
 import Users from "@/pages/users";
 import Settings from "@/pages/settings";
+import SourcesPage from "@/pages/SourcesPage";
+import DestinationsPage from "@/pages/DestinationsPage";
+import ForwardingPage from "@/pages/ForwardingPage";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -21,6 +24,9 @@ function Router() {
       <Route path="/workers" component={Workers} />
       <Route path="/users" component={Users} />
       <Route path="/settings" component={Settings} />
+      <Route path="/sources" component={SourcesPage} />
+      <Route path="/destinations" component={DestinationsPage} />
+      <Route path="/forwarding" component={ForwardingPage} />
       <Route component={NotFound} />
     </Switch>
   );
