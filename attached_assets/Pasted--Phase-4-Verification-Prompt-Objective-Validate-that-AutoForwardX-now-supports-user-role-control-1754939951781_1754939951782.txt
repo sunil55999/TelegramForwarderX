@@ -1,0 +1,141 @@
+📌 Phase 4 Verification Prompt
+
+Objective: Validate that AutoForwardX now supports user role control, subscription plans, RAM-aware session prioritization, and scalable worker infrastructure with admin-level observability.
+
+🧪 Verification Checklist
+
+User Roles & Access Control
+
+Action:
+
+Create three users: one admin, one premium_user, one free_user.
+
+Attempt to access restricted API endpoints and bot commands.
+
+Expected:
+
+Admin has access to all features and management tools.
+
+Premium user can use all core features with extended limits.
+
+Free user is limited in session/pair count and some filters.
+
+Check dashboard reflects correct roles after login.
+
+Subscription Plan Limits
+
+Action:
+
+Assign each user a subscription plan (Free, Pro, Elite).
+
+Free: Try to create 2 sessions → second one should be denied.
+
+Pro: Create 3 sessions and 10+ source-destination pairs.
+
+Expected:
+
+Plan-based limits are enforced correctly.
+
+Usage stats update in real-time on dashboard and via /plan.
+
+RAM Monitoring & Client Idle Mode
+
+Action:
+
+Start multiple sessions under Free and Premium users.
+
+Use a simulated RAM monitor to exceed the server’s threshold.
+
+Expected:
+
+Free-user sessions are paused or marked idle first.
+
+Premium-user sessions continue processing.
+
+System logs show resource decisions clearly.
+
+Priority Queue for Forwarding
+
+Action:
+
+Send 10 forwarding tasks for Free user and 5 for Premium.
+
+Throttle worker so queue builds up.
+
+Expected:
+
+Premium messages forwarded first.
+
+Free user messages delayed.
+
+Dashboard or /stats shows queue metrics and delays by user tier.
+
+Worker Management & Scaling (Skeleton)
+
+Action:
+
+Start 2 workers.
+
+Assign different session loads.
+
+Simulate worker overload.
+
+Expected:
+
+Worker IDs are shown in /workers and admin dashboard.
+
+Server recognizes worker load and simulates scaling need (log or dashboard notice).
+
+New sessions get assigned to less-loaded worker.
+
+Admin Monitoring Tools
+
+Action:
+
+As admin, run commands:
+
+/users → lists user roles and plans.
+
+/workers → shows workers and assigned sessions.
+
+/stats → shows RAM, sessions, user usage breakdown.
+
+Use dashboard to stop a user session.
+
+Expected:
+
+Admin tools return accurate system state.
+
+Stopping a session from admin UI terminates it in workers.
+
+Logging & Rate Limiting
+
+Action:
+
+Perform rapid API calls as Free user (e.g., add 10 sessions quickly).
+
+Forward 100 messages quickly.
+
+Expected:
+
+Free user is rate-limited and receives warning or denial.
+
+Rate limits reset after cooldown period.
+
+Logs show: user ID, timestamp, action, limit applied.
+
+📋 Reporting Format
+
+Feature	Action Description	Expected Result	Actual Result	Status (Pass/Fail)	Notes
+
+Optional: Attach screenshots or log excerpts for key steps.
+
+✅ Criteria to Pass Phase 4
+
+All 7 features tested and confirmed working.
+
+Logs and dashboard reflect real-time behavior accurately.
+
+No crashes or memory spikes during testing.
+
+Users cannot exceed subscription limits.
