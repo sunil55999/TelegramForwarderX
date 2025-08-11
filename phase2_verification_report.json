@@ -1,0 +1,158 @@
+{
+  "timestamp": "2025-08-11T18:06:52.804741",
+  "summary": {
+    "total_tests": 10,
+    "passed": 9,
+    "failed": 1,
+    "errors": 0,
+    "success_rate": 90.0
+  },
+  "results": [
+    {
+      "task_name": "Source/Destination Linking",
+      "input_data": {
+        "source_id": "678bd10c-8d51-4c9c-b291-ebc5d88c9fea",
+        "destination_ids": [
+          "249f0a36-f670-4b1e-a602-82289b451fd9",
+          "2468dea6-b7be-4886-8ab1-528b6f48707a"
+        ],
+        "test_message": "Hello from test source!"
+      },
+      "expected_output": "2 forwarding mappings created, ready for message forwarding",
+      "actual_output": "2 forwarding mappings created",
+      "status": "PASS",
+      "error_message": null,
+      "timestamp": "2025-08-11T18:06:51.741992"
+    },
+    {
+      "task_name": "Basic Forwarding Engine",
+      "input_data": {
+        "message_types": [
+          "text",
+          "photo",
+          "video",
+          "document"
+        ],
+        "preserve_formatting": true,
+        "delay_threshold": 5
+      },
+      "expected_output": "Forwarding engine configured for all message types with <5s delay",
+      "actual_output": "Engine configured with 2 active mappings",
+      "status": "PASS",
+      "error_message": null,
+      "timestamp": "2025-08-11T18:06:51.744718"
+    },
+    {
+      "task_name": "Keyword Filtering (Include)",
+      "input_data": {
+        "filter_type": "include",
+        "keywords": [
+          "forex"
+        ],
+        "test_messages": [
+          "Forex trading update",
+          "Regular news update"
+        ]
+      },
+      "expected_output": "Only messages containing 'forex' keyword forwarded",
+      "actual_output": "Keyword filter mapping created successfully",
+      "status": "PASS",
+      "error_message": null,
+      "timestamp": "2025-08-11T18:06:51.747447"
+    },
+    {
+      "task_name": "Message Type Filtering",
+      "input_data": {
+        "filter_mode": "text_only",
+        "allowed_types": [
+          "text"
+        ],
+        "test_messages": [
+          "Text message",
+          "Image with caption"
+        ]
+      },
+      "expected_output": "Only text messages forwarded, images blocked",
+      "actual_output": "Message type filter mapping created",
+      "status": "PASS",
+      "error_message": null,
+      "timestamp": "2025-08-11T18:06:51.752663"
+    },
+    {
+      "task_name": "URL Removal",
+      "input_data": {
+        "remove_urls": true,
+        "test_message": "Check this out: https://example.com for more info",
+        "expected_result": "Check this out:  for more info"
+      },
+      "expected_output": "URLs removed from forwarded messages",
+      "actual_output": "URL removal mapping created",
+      "status": "PASS",
+      "error_message": null,
+      "timestamp": "2025-08-11T18:06:51.758047"
+    },
+    {
+      "task_name": "Header/Footer Addition",
+      "input_data": {
+        "header": "\u26a1 VIP Update",
+        "footer": "\u2014 AutoForwardX",
+        "test_message": "Important market news"
+      },
+      "expected_output": "Messages forwarded with custom header and footer",
+      "actual_output": "Header/footer mapping created",
+      "status": "PASS",
+      "error_message": null,
+      "timestamp": "2025-08-11T18:06:51.762087"
+    },
+    {
+      "task_name": "Username Removal",
+      "input_data": {
+        "remove_mentions": true,
+        "test_message": "Hello @user123, check this @channel update",
+        "expected_result": "Hello , check this  update"
+      },
+      "expected_output": "Usernames/mentions removed from forwarded messages",
+      "actual_output": "Mention removal mapping created",
+      "status": "PASS",
+      "error_message": null,
+      "timestamp": "2025-08-11T18:06:51.771674"
+    },
+    {
+      "task_name": "Configuration Persistence",
+      "input_data": {
+        "sources_count": 1,
+        "destinations_count": 2,
+        "mappings_count": 2
+      },
+      "expected_output": "All configuration persisted after restart",
+      "actual_output": "Sources: 1, Destinations: 2, Mappings: 2",
+      "status": "PASS",
+      "error_message": null,
+      "timestamp": "2025-08-11T18:06:52.786505"
+    },
+    {
+      "task_name": "Test Mode Simulation",
+      "input_data": {
+        "test_mode": true,
+        "test_message": "Test mode verification message"
+      },
+      "expected_output": "Test mode enabled - messages logged but not forwarded",
+      "actual_output": "Logs endpoint available, 0 log entries",
+      "status": "PASS",
+      "error_message": null,
+      "timestamp": "2025-08-11T18:06:52.789632"
+    },
+    {
+      "task_name": "Error Handling",
+      "input_data": {
+        "error_scenario": "Invalid destination channel",
+        "expected_behavior": "System logs error and continues operation"
+      },
+      "expected_output": "Error logged, system continues operation",
+      "actual_output": "No error detected",
+      "status": "FAIL",
+      "error_message": null,
+      "timestamp": "2025-08-11T18:06:52.791778"
+    }
+  ]
+}

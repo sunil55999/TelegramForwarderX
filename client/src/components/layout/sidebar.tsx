@@ -55,6 +55,12 @@ export default function DashboardLayout({ children }: SidebarProps) {
       testId: "nav-forwarding"
     },
     {
+      name: "Logs",
+      path: "/logs",
+      icon: "fas fa-list-alt",
+      testId: "nav-logs"
+    },
+    {
       name: "Workers",
       path: "/workers",
       icon: "fas fa-cogs",

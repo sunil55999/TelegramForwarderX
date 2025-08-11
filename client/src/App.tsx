@@ -12,6 +12,7 @@ import Settings from "@/pages/settings";
 import SourcesPage from "@/pages/SourcesPage";
 import DestinationsPage from "@/pages/DestinationsPage";
 import ForwardingPage from "@/pages/ForwardingPage";
+import LogsPage from "@/pages/LogsPage";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -27,6 +28,7 @@ function Router() {
       <Route path="/sources" component={SourcesPage} />
       <Route path="/destinations" component={DestinationsPage} />
       <Route path="/forwarding" component={ForwardingPage} />
+      <Route path="/logs" component={LogsPage} />
       <Route component={NotFound} />
     </Switch>
   );
