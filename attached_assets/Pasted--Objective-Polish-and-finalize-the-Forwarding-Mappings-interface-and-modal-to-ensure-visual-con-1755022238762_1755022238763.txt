@@ -1,0 +1,111 @@
+🎯 Objective:
+Polish and finalize the “Forwarding Mappings” interface and modal to ensure visual consistency, proper functionality, and streamlined input flow. Apply these fixes across both the main page and the Create Mapping modal.
+
+✅ Tasks Breakdown:
+
+🔧 UI/Component Fixes:
+
+Fix button text visibility issue:
+
+Ensure all buttons (e.g., Cancel, Create Mapping) have visible, readable text on dark background.
+
+Buttons should inherit text color from a primary light palette variable (e.g., --text-primary-light).
+
+Sidebar toggle button:
+
+Properly position the minimize/maximize sidebar button (top-left or bottom-left aligned with sidebar).
+
+Ensure the toggle is not overlapping page content and is clearly visible in both expanded and collapsed states.
+
+Remove Priority (1–10) field from Create Mapping modal:
+
+This adds unnecessary complexity for most users and isn’t user-facing logic.
+
+If it’s needed internally, set a default priority in the backend instead.
+
+Remove the Phone input field from both Source & Destination:
+
+Not required at this stage.
+
+Replace it with auto-fill logic or keep it backend-only if needed for account association.
+
+Remove the surrounding container/box around the phone field once it’s removed to avoid layout gaps.
+
+Remove any unnecessary borders or shadows on unused field boxes.
+
+🧩 Layout & Design Consistency:
+
+Maintain consistent padding, spacing, and corner radius between:
+
+Chat Title and Type inputs
+
+Source and Destination cards
+
+Button groups (Create / Cancel)
+
+Check hover and active states of buttons for accessibility (e.g., high contrast, visible focus outline).
+
+Match all fonts (family, size, weight) to the rest of the dashboard UI.
+
+🎨 Theme Consistency:
+
+Double-check all fields, modals, and sidebar elements use consistent dark mode tokens:
+
+Background: #121212 or --bg-dark
+
+Inputs: Slightly lighter (e.g., #1c1c1c)
+
+Text: Light gray or white (#e0e0e0 / #ffffff)
+
+Accent (buttons, highlights): Cyan or theme-primary (e.g., #00cfff or --accent)
+
+📦 Mapping Page Improvements:
+
+Fix layout glitches on the main Forwarding Mappings page:
+
+Empty state (Create Your First Mapping) should be vertically and horizontally centered.
+
+Ensure the Create Mapping button is aligned top-right without overlapping or floating off the container.
+
+On narrow screens, gracefully stack sidebar and content (responsive layout).
+
+🚫 Remove Unused or Obsolete Elements:
+
+Ensure the following are permanently removed from both frontend view and API submission:
+
+Source/Destination “Add Source” or separate source pages
+
+API ID/API Hash fields unless required for account login
+
+Priority field
+
+Animation on pair type selection (disable transitions)
+
+🔁 Functionality:
+
+Clicking “Create Mapping” should:
+
+Validate both Source and Destination titles and types
+
+If valid, send API request to create mapping (with inline creation of source/destination if they don’t exist)
+
+Show toast or banner on success/failure
+
+Reset modal to clean state on close
+
+📌 Optional Suggestion:
+
+Use a schema-based validation library like Yup or Zod if you're using React, to ensure required fields (title/type) are present and avoid sending blank values like phone.
+
+✅ Example Snippet for Removing Phone Field:
+
+React JSX (simplified):
+
+jsx
+Copy
+Edit
+{/* BEFORE */}
+<input type="text" placeholder="+1234567890" className="form-input" />
+
+{/* AFTER – completely removed or replaced */}
+{/* No phone field shown at all */}
