@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -98,6 +99,7 @@ const messageTypeOptions = [
 ];
 
 export default function ForwardingPage() {
+  const [, setLocation] = useLocation();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const { toast } = useToast();
@@ -766,6 +768,15 @@ export default function ForwardingPage() {
                   }>
                     {mapping.isActive ? "Active" : "Inactive"}
                   </Badge>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setLocation(`/forwarding/rules?mapping=${mapping.id}`)}
+                    className="text-[#00B4D8] hover:bg-[#00B4D8]/10 rounded-lg p-2"
+                    title="Edit Advanced Rules"
+                  >
+                    <Settings className="w-4 h-4" />
+                  </Button>
                   <Button
                     size="sm"
                     variant="ghost"

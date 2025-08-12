@@ -320,3 +320,170 @@ async def toggle_mapping(mapping_id: str, current_user: User = Depends(get_curre
         )
         
         return {"isActive": new_status}
+
+
+@forwarding_router.get("/mappings/{mapping_id}/rules")
+async def get_advanced_rules(mapping_id: str, current_user: User = Depends(get_current_user)):
+    """Get advanced message rules for a specific mapping"""
+    async with db.get_connection() as conn:
+        # Verify ownership
+        mapping = await conn.fetchrow(
+            "SELECT * FROM forwarding_mappings WHERE id = $1 AND user_id = $2",
+            mapping_id, current_user["id"]
+        )
+        
+        if not mapping:
+            raise HTTPException(status_code=404, detail="Mapping not found")
+        
+        # Get existing rules
+        filters = await conn.fetchrow(
+            "SELECT * FROM message_filters WHERE mapping_id = $1",
+            mapping_id
+        )
+        
+        editing = await conn.fetchrow(
+            "SELECT * FROM message_editing WHERE mapping_id = $1",
+            mapping_id
+        )
+        
+        # Get regex rules
+        regex_rules = await conn.fetch(
+            "SELECT * FROM regex_editing_rules WHERE mapping_id = $1 ORDER BY created_at",
+            mapping_id
+        )
+        
+        return {
+            "regexRules": [
+                {
+                    "id": str(rule["id"]),
+                    "findPattern": rule["find_pattern"],
+                    "replaceWith": rule["replace_with"],
+                    "isEnabled": rule["is_enabled"],
+                    "flags": rule["flags"] or "gi",
+                }
+                for rule in regex_rules
+            ],
+            "blockWords": filters["block_words"] if filters else [],
+            "includeKeywords": filters["include_keywords"] if filters else [],
+            "excludeKeywords": filters["exclude_keywords"] if filters else [],
+            "keywordMatchMode": filters["keyword_match_mode"] if filters else "any",
+            "caseSensitive": filters["case_sensitive"] if filters else False,
+            "headerText": editing["header_text"] if editing else "",
+            "footerText": editing["footer_text"] if editing else "",
+            "removeMentions": editing["remove_mentions"] if editing else False,
+            "removeUrls": editing["remove_urls"] if editing else False,
+            "mediaFilter": filters["media_filter"] if filters else "all",
+            "forwardingMode": filters["forwarding_mode"] if filters else "copy",
+            "delayEnabled": filters["delay_enabled"] if filters else False,
+            "delaySeconds": filters["delay_seconds"] if filters else 0,
+            "autoReplyRules": filters["auto_reply_rules"] if filters else [],
+            "schedulingEnabled": filters["scheduling_enabled"] if filters else False,
+            "scheduleStartTime": filters["schedule_start_time"] if filters else "",
+            "scheduleEndTime": filters["schedule_end_time"] if filters else "",
+            "scheduleDays": filters["schedule_days"] if filters else [],
+        }
+
+
+@forwarding_router.put("/mappings/{mapping_id}/rules")
+async def update_advanced_rules(
+    mapping_id: str, 
+    rules_data: dict,
+    current_user: User = Depends(get_current_user)
+):
+    """Update advanced message rules for a specific mapping"""
+    async with db.get_connection() as conn:
+        async with conn.transaction():
+            # Verify ownership
+            mapping = await conn.fetchrow(
+                "SELECT * FROM forwarding_mappings WHERE id = $1 AND user_id = $2",
+                mapping_id, current_user["id"]
+            )
+            
+            if not mapping:
+                raise HTTPException(status_code=404, detail="Mapping not found")
+            
+            # Update or create message filters
+            await conn.execute(
+                """
+                INSERT INTO message_filters (
+                    mapping_id, include_keywords, exclude_keywords, keyword_match_mode,
+                    case_sensitive, block_words, media_filter, forwarding_mode,
+                    delay_enabled, delay_seconds, auto_reply_rules, scheduling_enabled,
+                    schedule_start_time, schedule_end_time, schedule_days
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+                ON CONFLICT (mapping_id) DO UPDATE SET
+                    include_keywords = EXCLUDED.include_keywords,
+                    exclude_keywords = EXCLUDED.exclude_keywords,
+                    keyword_match_mode = EXCLUDED.keyword_match_mode,
+                    case_sensitive = EXCLUDED.case_sensitive,
+                    block_words = EXCLUDED.block_words,
+                    media_filter = EXCLUDED.media_filter,
+                    forwarding_mode = EXCLUDED.forwarding_mode,
+                    delay_enabled = EXCLUDED.delay_enabled,
+                    delay_seconds = EXCLUDED.delay_seconds,
+                    auto_reply_rules = EXCLUDED.auto_reply_rules,
+                    scheduling_enabled = EXCLUDED.scheduling_enabled,
+                    schedule_start_time = EXCLUDED.schedule_start_time,
+                    schedule_end_time = EXCLUDED.schedule_end_time,
+                    schedule_days = EXCLUDED.schedule_days,
+                    updated_at = now()
+                """,
+                mapping_id,
+                rules_data.get("includeKeywords", []),
+                rules_data.get("excludeKeywords", []),
+                rules_data.get("keywordMatchMode", "any"),
+                rules_data.get("caseSensitive", False),
+                rules_data.get("blockWords", []),
+                rules_data.get("mediaFilter", "all"),
+                rules_data.get("forwardingMode", "copy"),
+                rules_data.get("delayEnabled", False),
+                rules_data.get("delaySeconds", 0),
+                rules_data.get("autoReplyRules", []),
+                rules_data.get("schedulingEnabled", False),
+                rules_data.get("scheduleStartTime", ""),
+                rules_data.get("scheduleEndTime", ""),
+                rules_data.get("scheduleDays", [])
+            )
+            
+            # Update or create message editing
+            await conn.execute(
+                """
+                INSERT INTO message_editing (
+                    mapping_id, header_text, footer_text, remove_mentions, remove_urls
+                ) VALUES ($1, $2, $3, $4, $5)
+                ON CONFLICT (mapping_id) DO UPDATE SET
+                    header_text = EXCLUDED.header_text,
+                    footer_text = EXCLUDED.footer_text,
+                    remove_mentions = EXCLUDED.remove_mentions,
+                    remove_urls = EXCLUDED.remove_urls,
+                    updated_at = now()
+                """,
+                mapping_id,
+                rules_data.get("headerText", ""),
+                rules_data.get("footerText", ""),
+                rules_data.get("removeMentions", False),
+                rules_data.get("removeUrls", False)
+            )
+            
+            # Handle regex rules - delete existing and insert new ones
+            await conn.execute("DELETE FROM regex_editing_rules WHERE mapping_id = $1", mapping_id)
+            
+            regex_rules = rules_data.get("regexRules", [])
+            if regex_rules:
+                for rule in regex_rules:
+                    await conn.execute(
+                        """
+                        INSERT INTO regex_editing_rules (
+                            mapping_id, find_pattern, replace_with, is_enabled, flags
+                        ) VALUES ($1, $2, $3, $4, $5)
+                        """,
+                        mapping_id,
+                        rule.get("findPattern", ""),
+                        rule.get("replaceWith", ""),
+                        rule.get("isEnabled", True),
+                        rule.get("flags", "gi")
+                    )
+            
+            logger.info(f"Advanced rules updated for mapping {mapping_id} by user {current_user['username']}")
+            
+            return {"message": "Advanced rules updated successfully"}

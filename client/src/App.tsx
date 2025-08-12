@@ -23,6 +23,7 @@ import Statistics from "@/pages/Statistics";
 // User Dashboard Pages
 import Dashboard from "@/pages/dashboard";
 import ForwardingPage from "@/pages/ForwardingPage";
+import AdvancedMessageRules from "@/pages/AdvancedMessageRules";
 import RegexRules from "@/pages/RegexRules";
 import PendingMessages from "@/pages/PendingMessages";
 import SubscriptionDashboard from "@/pages/SubscriptionDashboard";
@@ -114,6 +115,14 @@ function Router() {
         <ProtectedRoute>
           <UserLayout>
             <ForwardingPage />
+          </UserLayout>
+        </ProtectedRoute>
+      </Route>
+      
+      <Route path="/forwarding/rules">
+        <ProtectedRoute>
+          <UserLayout>
+            <AdvancedMessageRules />
           </UserLayout>
         </ProtectedRoute>
       </Route>

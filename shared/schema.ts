@@ -164,6 +164,24 @@ export const messageFilters = pgTable("message_filters", {
   minMessageLength: integer("min_message_length").notNull().default(0),
   maxMessageLength: integer("max_message_length").notNull().default(4096),
   
+  // Advanced filters
+  blockWords: text("block_words").array(), // Words that will block messages
+  mediaFilter: text("media_filter").notNull().default("all"), // "all" | "text-only" | "media-only"
+  forwardingMode: text("forwarding_mode").notNull().default("copy"), // "copy" | "keep-sender"
+  
+  // Delay settings
+  delayEnabled: boolean("delay_enabled").notNull().default(false),
+  delaySeconds: integer("delay_seconds").notNull().default(0),
+  
+  // Auto-reply settings
+  autoReplyRules: jsonb("auto_reply_rules").default([]), // Array of auto-reply patterns
+  
+  // Scheduling settings
+  schedulingEnabled: boolean("scheduling_enabled").notNull().default(false),
+  scheduleStartTime: text("schedule_start_time"), // HH:MM format
+  scheduleEndTime: text("schedule_end_time"), // HH:MM format
+  scheduleDays: text("schedule_days").array(), // Days of week when active
+  
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
   updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
