@@ -3,57 +3,219 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import ProtectedRoute from "@/components/auth/ProtectedRoute";
+import AdminLayout from "@/components/layout/AdminLayout";
+import UserLayout from "@/components/layout/UserLayout";
+
+// Auth & Public Pages
 import Login from "@/pages/login";
-import Dashboard from "@/pages/dashboard";
-import Sessions from "@/pages/sessions";
+import NotFound from "@/pages/not-found";
+
+// Admin Pages
+import AdminOverview from "@/pages/admin/AdminOverview";
+import AdminUsers from "@/pages/admin/AdminUsers";
+import AdminSessions from "@/pages/admin/AdminSessions";
 import Workers from "@/pages/workers";
-import Users from "@/pages/users";
+import LogsPage from "@/pages/LogsPage";
 import Settings from "@/pages/settings";
+import Statistics from "@/pages/Statistics";
+
+// User Dashboard Pages
+import Dashboard from "@/pages/dashboard";
 import SourcesPage from "@/pages/SourcesPage";
 import DestinationsPage from "@/pages/DestinationsPage";
 import ForwardingPage from "@/pages/ForwardingPage";
-import LogsPage from "@/pages/LogsPage";
-import NotFound from "@/pages/not-found";
-// Phase 3 pages
 import RegexRules from "@/pages/RegexRules";
 import PendingMessages from "@/pages/PendingMessages";
-import Statistics from "@/pages/Statistics";
-import Phase3Verification from "@/pages/Phase3Verification";
-import Phase4Verification from "@/pages/Phase4Verification";
-import AdminDashboard from "@/pages/AdminDashboard";
 import SubscriptionDashboard from "@/pages/SubscriptionDashboard";
-// Phase 5 pages
 import MultiAccountManagement from "@/pages/MultiAccountManagement";
 import TeamCollaboration from "@/pages/TeamCollaboration";
 import SessionResilience from "@/pages/SessionResilience";
-// Phase 6 pages
+
+// Verification Pages (can be accessed by both)
+import Phase3Verification from "@/pages/Phase3Verification";
+import Phase4Verification from "@/pages/Phase4Verification";
 import Phase6Verification from "@/pages/Phase6Verification";
 
 function Router() {
   return (
     <Switch>
+      {/* Public Routes */}
       <Route path="/" component={Login} />
       <Route path="/login" component={Login} />
-      <Route path="/dashboard" component={Dashboard} />
-      <Route path="/sessions" component={Sessions} />
-      <Route path="/workers" component={Workers} />
-      <Route path="/users" component={Users} />
-      <Route path="/settings" component={Settings} />
-      <Route path="/sources" component={SourcesPage} />
-      <Route path="/destinations" component={DestinationsPage} />
-      <Route path="/forwarding" component={ForwardingPage} />
-      <Route path="/logs" component={LogsPage} />
-      <Route path="/regex-rules" component={RegexRules} />
-      <Route path="/pending-messages" component={PendingMessages} />
-      <Route path="/statistics" component={Statistics} />
-      <Route path="/phase3-verification" component={Phase3Verification} />
-      <Route path="/phase4-verification" component={Phase4Verification} />
-      <Route path="/subscription" component={SubscriptionDashboard} />
-      <Route path="/admin" component={AdminDashboard} />
-      <Route path="/multi-accounts" component={MultiAccountManagement} />
-      <Route path="/team-collaboration" component={TeamCollaboration} />
-      <Route path="/session-resilience" component={SessionResilience} />
-      <Route path="/phase6-verification" component={Phase6Verification} />
+      
+      {/* Admin Panel Routes */}
+      <Route path="/admin">
+        <ProtectedRoute requireAdmin={true}>
+          <AdminLayout>
+            <AdminOverview />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      
+      <Route path="/admin/users">
+        <ProtectedRoute requireAdmin={true}>
+          <AdminLayout>
+            <AdminUsers />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      
+      <Route path="/admin/sessions">
+        <ProtectedRoute requireAdmin={true}>
+          <AdminLayout>
+            <AdminSessions />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      
+      <Route path="/admin/workers">
+        <ProtectedRoute requireAdmin={true}>
+          <AdminLayout>
+            <Workers />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      
+      <Route path="/admin/statistics">
+        <ProtectedRoute requireAdmin={true}>
+          <AdminLayout>
+            <Statistics />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      
+      <Route path="/admin/logs">
+        <ProtectedRoute requireAdmin={true}>
+          <AdminLayout>
+            <LogsPage />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      
+      <Route path="/admin/settings">
+        <ProtectedRoute requireAdmin={true}>
+          <AdminLayout>
+            <Settings />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+
+      {/* User Dashboard Routes */}
+      <Route path="/dashboard">
+        <ProtectedRoute>
+          <UserLayout>
+            <Dashboard />
+          </UserLayout>
+        </ProtectedRoute>
+      </Route>
+      
+      <Route path="/sources">
+        <ProtectedRoute>
+          <UserLayout>
+            <SourcesPage />
+          </UserLayout>
+        </ProtectedRoute>
+      </Route>
+      
+      <Route path="/destinations">
+        <ProtectedRoute>
+          <UserLayout>
+            <DestinationsPage />
+          </UserLayout>
+        </ProtectedRoute>
+      </Route>
+      
+      <Route path="/forwarding">
+        <ProtectedRoute>
+          <UserLayout>
+            <ForwardingPage />
+          </UserLayout>
+        </ProtectedRoute>
+      </Route>
+      
+      <Route path="/regex-rules">
+        <ProtectedRoute>
+          <UserLayout>
+            <RegexRules />
+          </UserLayout>
+        </ProtectedRoute>
+      </Route>
+      
+      <Route path="/pending-messages">
+        <ProtectedRoute>
+          <UserLayout>
+            <PendingMessages />
+          </UserLayout>
+        </ProtectedRoute>
+      </Route>
+      
+      <Route path="/statistics">
+        <ProtectedRoute>
+          <UserLayout>
+            <Statistics />
+          </UserLayout>
+        </ProtectedRoute>
+      </Route>
+      
+      <Route path="/subscription">
+        <ProtectedRoute>
+          <UserLayout>
+            <SubscriptionDashboard />
+          </UserLayout>
+        </ProtectedRoute>
+      </Route>
+      
+      <Route path="/multi-accounts">
+        <ProtectedRoute>
+          <UserLayout>
+            <MultiAccountManagement />
+          </UserLayout>
+        </ProtectedRoute>
+      </Route>
+      
+      <Route path="/team-collaboration">
+        <ProtectedRoute>
+          <UserLayout>
+            <TeamCollaboration />
+          </UserLayout>
+        </ProtectedRoute>
+      </Route>
+      
+      <Route path="/session-resilience">
+        <ProtectedRoute>
+          <UserLayout>
+            <SessionResilience />
+          </UserLayout>
+        </ProtectedRoute>
+      </Route>
+
+      {/* Verification Pages - Accessible by all authenticated users */}
+      <Route path="/phase3-verification">
+        <ProtectedRoute>
+          <UserLayout>
+            <Phase3Verification />
+          </UserLayout>
+        </ProtectedRoute>
+      </Route>
+      
+      <Route path="/phase4-verification">
+        <ProtectedRoute>
+          <UserLayout>
+            <Phase4Verification />
+          </UserLayout>
+        </ProtectedRoute>
+      </Route>
+      
+      <Route path="/phase6-verification">
+        <ProtectedRoute>
+          <UserLayout>
+            <Phase6Verification />
+          </UserLayout>
+        </ProtectedRoute>
+      </Route>
+
+      {/* Fallback */}
       <Route component={NotFound} />
     </Switch>
   );

@@ -137,3 +137,75 @@ export const requirePermission = (requiredPermission: string) => {
 export const requireAdmin = () => {
   return requirePermission("admin");
 };
+
+// Check if user is admin
+export const isAdmin = (user?: User | null): boolean => {
+  if (!user) {
+    const { user: currentUser } = getAuthState();
+    user = currentUser;
+  }
+  return user?.userType === "admin" || false;
+};
+
+// Role-based redirect after login
+export const getPostLoginRedirect = (user: User): string => {
+  if (isAdmin(user)) {
+    return "/admin";
+  }
+  return "/dashboard";
+};
+
+// Check if current route is accessible for user role
+export const isRouteAccessible = (path: string, user?: User | null): boolean => {
+  if (!user) {
+    const { user: currentUser } = getAuthState();
+    user = currentUser;
+  }
+  
+  if (!user) return false;
+  
+  // Admin routes - only accessible by admins
+  const adminRoutes = [
+    "/admin",
+    "/admin/",
+    "/admin/users",
+    "/admin/workers", 
+    "/admin/sessions",
+    "/admin/statistics",
+    "/admin/logs",
+    "/admin/settings"
+  ];
+  
+  // User dashboard routes - accessible by all authenticated users
+  const userRoutes = [
+    "/dashboard",
+    "/dashboard/",
+    "/sources",
+    "/destinations", 
+    "/forwarding",
+    "/regex-rules",
+    "/pending-messages",
+    "/subscription",
+    "/multi-accounts",
+    "/team-collaboration",
+    "/session-resilience"
+  ];
+  
+  // Check admin routes
+  if (adminRoutes.some(route => path.startsWith(route))) {
+    return isAdmin(user);
+  }
+  
+  // Check user routes - accessible to all authenticated users
+  if (userRoutes.some(route => path.startsWith(route))) {
+    return true;
+  }
+  
+  // Public routes
+  const publicRoutes = ["/", "/login"];
+  if (publicRoutes.includes(path)) {
+    return true;
+  }
+  
+  return false;
+};

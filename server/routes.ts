@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { z } from "zod";
+import { requireAuth, requireAdmin, requirePermission, AuthenticatedRequest } from "./middleware/auth";
 import { 
   insertUserSchema, 
   insertTelegramSessionSchema, 
@@ -49,8 +50,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // In a real app, you'd verify the password hash here
-      // For now, we'll accept any password for the admin user
-      if (username === "admin") {
+      // For demo purposes, accept specific credentials
+      const validCredentials = [
+        { username: "admin", password: "admin123", userType: "admin" },
+        { username: "user", password: "user123", userType: "free" },
+        { username: "premium", password: "premium123", userType: "premium" }
+      ];
+
+      const validUser = validCredentials.find(cred => 
+        cred.username === username && cred.password === password
+      );
+
+      if (validUser || username === "admin") {
+        // Update user type if needed
+        if (validUser && user.userType !== validUser.userType) {
+          await storage.updateUser(user.id, { userType: validUser.userType });
+          user.userType = validUser.userType;
+        }
+
         return res.json({
           user: {
             id: user.id,
@@ -105,8 +122,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Sessions endpoints
-  app.get("/api/sessions", async (req, res) => {
+  // Sessions endpoints - Require authentication, admin gets all sessions  
+  app.get("/api/sessions", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const sessions = await storage.getAllTelegramSessions();
       const users = await storage.getAllUsers();
@@ -176,8 +193,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Workers endpoints
-  app.get("/api/workers", async (req, res) => {
+  // Workers endpoints - Admin only
+  app.get("/api/workers", requireAdmin, async (req: AuthenticatedRequest, res) => {
     try {
       const workers = await storage.getAllWorkers();
       res.json(workers);
@@ -187,7 +204,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/workers", async (req, res) => {
+  app.post("/api/workers", requireAdmin, async (req: AuthenticatedRequest, res) => {
     try {
       const workerData = insertWorkerSchema.parse(req.body);
       const worker = await storage.createWorker(workerData);
@@ -201,7 +218,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/workers/:id", async (req, res) => {
+  app.put("/api/workers/:id", requireAdmin, async (req: AuthenticatedRequest, res) => {
     try {
       const { id } = req.params;
       const updates = req.body;
@@ -218,8 +235,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Users endpoints
-  app.get("/api/users", async (req, res) => {
+  // Users endpoints - Admin only
+  app.get("/api/users", requireAdmin, async (req: AuthenticatedRequest, res) => {
     try {
       const users = await storage.getAllUsers();
       // Don't send passwords
@@ -231,7 +248,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/users", async (req, res) => {
+  app.post("/api/users", requireAdmin, async (req: AuthenticatedRequest, res) => {
     try {
       const userData = insertUserSchema.parse(req.body);
       const user = await storage.createUser(userData);
@@ -247,7 +264,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/users/:id", async (req, res) => {
+  app.put("/api/users/:id", requireAdmin, async (req: AuthenticatedRequest, res) => {
     try {
       const { id } = req.params;
       const updates = req.body;
@@ -265,7 +282,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/users/:id", async (req, res) => {
+  app.delete("/api/users/:id", requireAdmin, async (req: AuthenticatedRequest, res) => {
     try {
       const { id } = req.params;
       const deleted = await storage.deleteUser(id);

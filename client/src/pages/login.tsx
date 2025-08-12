@@ -7,6 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { getPostLoginRedirect } from "@/lib/auth";
 
 export default function Login() {
   const [, setLocation] = useLocation();
@@ -36,10 +37,12 @@ export default function Login() {
 
       toast({
         title: "Login successful",
-        description: "Welcome to AutoForwardX!",
+        description: `Welcome to AutoForwardX${data.user.userType === 'admin' ? ' Admin Panel' : ''}!`,
       });
 
-      setLocation("/dashboard");
+      // Role-based redirect
+      const redirectPath = getPostLoginRedirect(data.user);
+      setLocation(redirectPath);
     } catch (error: any) {
       toast({
         title: "Login failed",
