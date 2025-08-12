@@ -107,14 +107,14 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         <nav className="mt-8 px-4 space-y-2">
           {adminNavigationItems.map((item) => (
             <Link key={item.name} href={item.href}>
-              <a className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
+              <div className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors cursor-pointer ${
                 item.current
                   ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-100'
                   : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
               }`}>
                 <item.icon className="mr-3 h-5 w-5" />
                 {item.name}
-              </a>
+              </div>
             </Link>
           ))}
         </nav>
