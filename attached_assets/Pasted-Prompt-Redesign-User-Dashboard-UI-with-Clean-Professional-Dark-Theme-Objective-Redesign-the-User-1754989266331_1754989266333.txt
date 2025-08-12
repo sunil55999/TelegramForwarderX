@@ -1,0 +1,98 @@
+Prompt: Redesign User Dashboard UI with Clean & Professional Dark Theme
+Objective:
+Redesign the User Dashboard for AutoForwardX to provide a sleek, professional dark theme that is easy to navigate, mobile-friendly, and beginner-friendly. The dashboard should have minimal animations, clean typography, and easy-to-read statistics while still maintaining a subtle ninja/anime aesthetic for visual appeal.
+
+Key Features to Implement:
+Color Scheme & Theme:
+
+Dark Background: Use a dark gray to black background (#121212 or #181818).
+
+Card Backgrounds: Slightly lighter dark gray for cards (#232323 or #333333) with soft drop shadows.
+
+Text: Use white (#E0E0E0) for regular text and light gray for secondary text.
+
+Accents: Neon teal or blue for interactive elements like buttons, active states, and progress bars. Use muted neon colors for a professional look.
+
+Minimal Animations: Avoid excessive animations but use subtle hover effects, glowing buttons, and neon progress bars for interactive elements.
+
+Main Navigation Sidebar:
+
+Simplified Icons for sections like Dashboard, Sources, Destinations, Forwarding Rules, Logs, and Settings.
+
+Hover Effects: Highlight the active section with a neon underline or background color change (e.g., #00B4D8).
+
+Collapsible Sidebar for mobile view with icons and labels clearly visible.
+
+Dashboard Header:
+
+Display the user's name with a welcome message (e.g., "Welcome back, [Username]!").
+
+Display the system health (CPU, RAM, Database load) with neon progress bars or percentage indicators.
+
+Show Active Sessions, Active Workers, and Messages Today in modular card-style widgets with progress bars.
+
+System Health & Activity Feed:
+
+System Health Cards: Include metrics for CPU, Memory, and Database Load using smooth progress bars with neon accents.
+
+Recent Activity Feed: Show recent system activities (e.g., user registration, session started, etc.) in a simple vertical feed with subtle icons.
+
+Status Indicators: Display system status such as Operational or Warning in a clean, readable format.
+
+Card-Based Layout for Stats:
+
+Active Sessions, Active Workers, Messages Today in modular cards with rounded corners, soft shadows, and glowing highlights on hover.
+
+Use simple charts or progress bars to show the number of messages forwarded or workers processing data.
+
+Cards should have titles, values, and small icons related to the content (e.g., a user icon for active users).
+
+Mobile Responsiveness:
+
+Ensure the layout is responsive, with a collapsible sidebar and stacked content sections on smaller screens.
+
+Use flexbox/grid layout for components to ensure they adjust automatically for tablet/mobile screens.
+
+Interactive Buttons & Controls:
+
+Flat buttons with neon hover effects (e.g., glow when clicked, color change on hover).
+
+Use rounded corners for all buttons to keep the modern look.
+
+Include interactive modals for settings, session management, and logs with a clean, minimalist design.
+
+Footer & Session Controls:
+
+Add a simple footer with important session controls like Pause Session, Stop Session, or Add New Session.
+
+Include clear action buttons that are easy to find and intuitive.
+
+Typography & Icons:
+
+Use modern, readable fonts (e.g., Poppins, Roboto, Inter) with clear font sizes for headings, body text, and labels.
+
+Icons should be minimal, simple, and intuitive with consistent sizes.
+
+Icons should be used sparingly and should not distract from the key content.
+
+Expected Deliverables:
+Updated User Dashboard UI with the new professional dark theme.
+
+Mobile-responsive layout that looks great on both desktops and mobile devices.
+
+Improved Navigation with collapsible sidebar, cleaner layout, and consistent color theme.
+
+Subtle Animations for buttons and interactive elements, such as glowing effects on hover.
+
+User Health Dashboard displaying system status, memory, CPU, and database health with smooth progress bars.
+
+Activity Feed that shows recent actions or events in a clean, easy-to-follow feed.
+
+Fully Integrated Frontend that communicates with backend (no broken links or empty sections).
+
+Additional Notes:
+The layout should prioritize user clarity and ease of access to essential features such as session management, system health, and recent activity.
+
+The user experience should be intuitive with easy-to-understand icons and clear call-to-action buttons.
+
+Ensure that no distracting animations are present; we want smooth transitions and hover effects, but not flashy or overpowering designs.
