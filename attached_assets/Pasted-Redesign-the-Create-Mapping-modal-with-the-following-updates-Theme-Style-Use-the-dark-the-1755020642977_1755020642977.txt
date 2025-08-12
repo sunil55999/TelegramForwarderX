@@ -1,0 +1,91 @@
+Redesign the “Create Mapping” modal with the following updates:
+
+🎨 Theme & Style:
+
+Use the dark theme colors (background: #121212 or similar, text: #ffffff, accent: theme primary).
+
+Remove unnecessary animations (e.g. dropdown bounce when clicking Pair Type).
+
+Use consistent rounded corners, spacing, and shadow depth across all sections.
+
+🧱 Layout Breakdown:
+
+Group fields into 3 clear blocks with dividers:
+
+Pair Details
+
+Source & Destination
+
+Optional Filters & Settings (collapsed by default)
+
+✏️ Pair Details:
+
+Pair Name (text input)
+
+Pair Type (dropdown: Channel → Channel, Channel → Group, Group → Channel, Group → Group)
+
+Priority (1–10, numeric step input)
+
+🔁 Source & Destination:
+
+Replace “+ Add Source” button with a flexible container that includes:
+
+Source Input Box:
+
+Chat Title (text input)
+
+Chat Type (dropdown: Channel, Group)
+
+Phone (optional)
+
+Destination Input Box:
+
+Chat Title (text input)
+
+Chat Type (dropdown: Channel, Group)
+
+Phone (optional)
+
+Let user choose from existing entries or add new ones inline (auto-detect via search).
+
+Do not ask for API ID/API Hash at this stage unless absolutely needed.
+
+⚙️ Optional Settings:
+
+Toggle “Show Advanced Options”
+
+When expanded, show Filters, Editing, and Tags tabs as they currently are.
+
+✅ Actions:
+
+Primary Button: “Create Mapping”
+
+On click, auto-create Source & Destination if new, then create Pair.
+
+Show toast on success/failure.
+
+Secondary: “Cancel”
+
+🧠 Backend Logic:
+
+Update mapping creation endpoint to support:
+
+Inline creation of source & destination if needed
+
+Avoid duplicate creation (check if title/type already exists)
+
+Return full mapping object on success
+
+Clean up any references to old Source/Destination pages
+
+✨ Extras:
+
+All text fields: consistent font-size, padding, and dark input style
+
+Show skeleton loading when dropdowns fetch data
+
+Add subtle transitions between tabs (not bouncy animations)
+
+🔧 Optional Dev Tip:
+
+If you're using React with Tailwind or a CSS-in-JS library, you can abstract each of the boxes (Source, Destination, Mapping Details) into components and reuse styles to prevent UI drift.

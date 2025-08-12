@@ -1,49 +1,37 @@
 import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2, Power, PowerOff, ArrowRight, Settings, Filter } from "lucide-react";
+import { z } from "zod";
+import { Plus, ArrowRight, Power, PowerOff, Trash2, Filter, Settings, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { apiRequest } from "@/lib/queryClient";
 
+// Form schema for the redesigned modal
 const createMappingSchema = z.object({
   pairName: z.string().min(1, "Pair name is required"),
-  pairType: z.enum(["channel-to-channel", "channel-to-group", "group-to-channel", "group-to-group"]),
-  sourceId: z.string().min(1, "Source is required"),
-  destinationId: z.string().min(1, "Destination is required"),
+  pairType: z.enum(["channel-to-channel", "channel-to-group", "group-to-channel", "group-to-group"]).default("channel-to-channel"),
   priority: z.number().min(1).max(10).default(1),
-  
-  // New source creation (optional)
-  newSource: z.object({
-    chatTitle: z.string().min(1, "Chat title is required"),
-    chatType: z.enum(["channel", "group"]),
-    phoneNumber: z.string().min(1, "Phone number is required"),
-    apiId: z.string().min(1, "API ID is required"),
-    apiHash: z.string().min(1, "API Hash is required"),
-  }).optional(),
-  
-  // New destination creation (optional)
-  newDestination: z.object({
-    chatTitle: z.string().min(1, "Chat title is required"),
-    chatType: z.enum(["channel", "group"]),
-    phoneNumber: z.string().min(1, "Phone number is required"),
-    apiId: z.string().min(1, "API ID is required"),
-    apiHash: z.string().min(1, "API Hash is required"),
-  }).optional(),
-  
-  // Filters
+  // Source details
+  sourceTitle: z.string().min(1, "Source title is required"),
+  sourceType: z.enum(["channel", "group"]).default("channel"),
+  sourcePhone: z.string().optional(),
+  // Destination details
+  destinationTitle: z.string().min(1, "Destination title is required"),
+  destinationType: z.enum(["channel", "group"]).default("channel"),
+  destinationPhone: z.string().optional(),
+  // Advanced filters
   includeKeywords: z.string().optional(),
   excludeKeywords: z.string().optional(),
   keywordMatchMode: z.enum(["any", "all"]).default("any"),
@@ -51,10 +39,9 @@ const createMappingSchema = z.object({
   allowedMessageTypes: z.array(z.string()).optional(),
   blockUrls: z.boolean().default(false),
   blockForwards: z.boolean().default(false),
-  minMessageLength: z.number().min(0).default(0),
-  maxMessageLength: z.number().min(1).default(4096),
-  
-  // Editing
+  minMessageLength: z.number().default(0),
+  maxMessageLength: z.number().default(4096),
+  // Advanced editing
   headerText: z.string().optional(),
   footerText: z.string().optional(),
   removeSenderInfo: z.boolean().default(false),
@@ -68,22 +55,17 @@ type CreateMappingFormData = z.infer<typeof createMappingSchema>;
 
 interface ForwardingMapping {
   id: string;
-  sourceId: string;
-  destinationId: string;
   sourceName: string;
   destinationName: string;
-  isActive: boolean;
   priority: number;
+  isActive: boolean;
+  createdAt: string;
   filters: {
     includeKeywords: string[];
     excludeKeywords: string[];
-    keywordMatchMode: string;
-    caseSensitive: boolean;
     allowedMessageTypes: string[];
     blockUrls: boolean;
     blockForwards: boolean;
-    minMessageLength: number;
-    maxMessageLength: number;
   };
   editing: {
     headerText?: string;
@@ -92,9 +74,7 @@ interface ForwardingMapping {
     removeUrls: boolean;
     removeHashtags: boolean;
     removeMentions: boolean;
-    preserveFormatting: boolean;
   };
-  createdAt: string;
 }
 
 interface Source {
@@ -123,8 +103,6 @@ const messageTypeOptions = [
 export default function ForwardingPage() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [showNewSourceForm, setShowNewSourceForm] = useState(false);
-  const [showNewDestinationForm, setShowNewDestinationForm] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -133,15 +111,24 @@ export default function ForwardingPage() {
     defaultValues: {
       pairName: "",
       pairType: "channel-to-channel",
-      sourceId: "",
-      destinationId: "",
       priority: 1,
+      sourceTitle: "",
+      sourceType: "channel",
+      sourcePhone: "",
+      destinationTitle: "",
+      destinationType: "channel", 
+      destinationPhone: "",
+      includeKeywords: "",
+      excludeKeywords: "",
       keywordMatchMode: "any",
       caseSensitive: false,
+      allowedMessageTypes: [],
       blockUrls: false,
       blockForwards: false,
       minMessageLength: 0,
       maxMessageLength: 4096,
+      headerText: "",
+      footerText: "",
       removeSenderInfo: false,
       removeUrls: false,
       removeHashtags: false,
@@ -154,25 +141,30 @@ export default function ForwardingPage() {
     queryKey: ["/api/forwarding/mappings"],
   });
 
-  const { data: sources = [] } = useQuery<Source[]>({
-    queryKey: ["/api/sources"],
-  });
-
-  const { data: destinations = [] } = useQuery<Destination[]>({
-    queryKey: ["/api/destinations"],
-  });
-
   const createMappingMutation = useMutation({
     mutationFn: (data: CreateMappingFormData) => {
-      // Transform form data to API format with support for new source/destination
       const apiData = {
         pairName: data.pairName,
         pairType: data.pairType,
-        sourceId: data.sourceId,
-        destinationId: data.destinationId,
         priority: data.priority,
-        newSource: data.newSource,
-        newDestination: data.newDestination,
+        // Create new source/destination with the provided details
+        newSource: {
+          chatTitle: data.sourceTitle,
+          chatType: data.sourceType,
+          phoneNumber: data.sourcePhone || "+1234567890",
+          apiId: "123456",
+          apiHash: "abcdef123456",
+          isActive: true,
+        },
+        newDestination: {
+          chatTitle: data.destinationTitle,
+          chatType: data.destinationType,
+          phoneNumber: data.destinationPhone || "+1234567890",
+          apiId: "123456",
+          apiHash: "abcdef123456", 
+          isActive: true,
+        },
+        // Filters and editing
         includeKeywords: data.includeKeywords ? data.includeKeywords.split(",").map(k => k.trim()) : [],
         excludeKeywords: data.excludeKeywords ? data.excludeKeywords.split(",").map(k => k.trim()) : [],
         keywordMatchMode: data.keywordMatchMode,
@@ -195,19 +187,15 @@ export default function ForwardingPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/forwarding/mappings"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/sources"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/destinations"] });
       setIsCreateDialogOpen(false);
       setShowAdvanced(false);
-      setShowNewSourceForm(false);
-      setShowNewDestinationForm(false);
       form.reset();
       toast({
         title: "Success",
         description: "Forwarding mapping created successfully",
       });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast({
         title: "Error",
         description: error.message || "Failed to create mapping",
@@ -216,30 +204,15 @@ export default function ForwardingPage() {
     },
   });
 
-  const deleteMappingMutation = useMutation({
-    mutationFn: (mappingId: string) => apiRequest(`/api/forwarding/mappings/${mappingId}`, {
-      method: "DELETE",
-    }),
+  const toggleMappingMutation = useMutation({
+    mutationFn: (id: string) => apiRequest(`/api/forwarding/mappings/${id}/toggle`, "PUT"),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/forwarding/mappings"] });
-      toast({
-        title: "Success",
-        description: "Mapping deleted successfully",
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to delete mapping",
-        variant: "destructive",
-      });
     },
   });
 
-  const toggleMappingMutation = useMutation({
-    mutationFn: (mappingId: string) => apiRequest(`/api/forwarding/mappings/${mappingId}/toggle`, {
-      method: "PATCH",
-    }),
+  const deleteMappingMutation = useMutation({
+    mutationFn: (id: string) => apiRequest(`/api/forwarding/mappings/${id}`, "DELETE"),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/forwarding/mappings"] });
     },
@@ -249,85 +222,82 @@ export default function ForwardingPage() {
     createMappingMutation.mutate(data);
   };
 
-  const handleDelete = (mappingId: string, sourceName: string, destinationName: string) => {
-    if (confirm(`Are you sure you want to delete the mapping from "${sourceName}" to "${destinationName}"?`)) {
-      deleteMappingMutation.mutate(mappingId);
+  const handleToggle = (id: string) => {
+    toggleMappingMutation.mutate(id);
+  };
+
+  const handleDelete = (id: string, sourceName: string, destinationName: string) => {
+    if (confirm(`Delete mapping from ${sourceName} to ${destinationName}?`)) {
+      deleteMappingMutation.mutate(id);
     }
   };
 
-  const handleToggle = (mappingId: string) => {
-    toggleMappingMutation.mutate(mappingId);
-  };
-
   if (isLoading) {
-    return (
-      <div className="space-y-4">
-        <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold">Forwarding Rules</h1>
-        </div>
-        <div>Loading forwarding rules...</div>
-      </div>
-    );
+    return <div className="p-8 text-[#E0E0E0]">Loading...</div>;
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold">Forwarding Rules</h1>
-          <p className="text-muted-foreground">
-            Create and manage forwarding mappings with filters and editing rules
-          </p>
+          <h1 className="text-3xl font-bold text-[#E0E0E0]">Forwarding Mappings</h1>
+          <p className="text-gray-400 mt-1">Manage your message forwarding rules</p>
         </div>
-        
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogTrigger asChild>
-            <Button>
+            <Button className="bg-[#00B4D8] hover:bg-[#00B4D8]/80 text-white rounded-lg">
               <Plus className="w-4 h-4 mr-2" />
               Create Mapping
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-[#121212] border-[#333333]">
             <DialogHeader>
-              <DialogTitle>Create Forwarding Mapping</DialogTitle>
-              <DialogDescription>
-                Set up a new forwarding rule with filters and editing options
+              <DialogTitle className="text-2xl text-[#E0E0E0]">Create New Mapping</DialogTitle>
+              <DialogDescription className="text-gray-400">
+                Set up a complete forwarding pair with source, destination, and optional filters
               </DialogDescription>
             </DialogHeader>
+            
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                {/* Pair Details Section */}
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+                {/* 1. Pair Details Block */}
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-[#E0E0E0] border-b border-[#333333] pb-2">
-                    Pair Details
-                  </h3>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="flex items-center gap-3 pb-2 border-b border-[#333333]">
+                    <h3 className="text-lg font-semibold text-[#E0E0E0]">Pair Details</h3>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <FormField
                       control={form.control}
                       name="pairName"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Pair Name *</FormLabel>
+                          <FormLabel className="text-[#E0E0E0]">Pair Name *</FormLabel>
                           <FormControl>
-                            <Input placeholder="e.g., News to Community" {...field} />
+                            <Input 
+                              placeholder="e.g., News to Community" 
+                              {...field} 
+                              className="bg-[#1E1E1E] border-[#333333] text-[#E0E0E0] focus:border-[#00B4D8] rounded-lg"
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
+                    
                     <FormField
                       control={form.control}
                       name="pairType"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Pair Type</FormLabel>
+                          <FormLabel className="text-[#E0E0E0]">Pair Type</FormLabel>
                           <Select onValueChange={field.onChange} defaultValue={field.value}>
                             <FormControl>
-                              <SelectTrigger>
+                              <SelectTrigger className="bg-[#1E1E1E] border-[#333333] text-[#E0E0E0] focus:border-[#00B4D8] rounded-lg">
                                 <SelectValue />
                               </SelectTrigger>
                             </FormControl>
-                            <SelectContent>
+                            <SelectContent className="bg-[#1E1E1E] border-[#333333]">
                               <SelectItem value="channel-to-channel">Channel → Channel</SelectItem>
                               <SelectItem value="channel-to-group">Channel → Group</SelectItem>
                               <SelectItem value="group-to-channel">Group → Channel</SelectItem>
@@ -338,594 +308,499 @@ export default function ForwardingPage() {
                         </FormItem>
                       )}
                     />
-                  </div>
-                  <FormField
-                    control={form.control}
-                    name="priority"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Priority (1-10)</FormLabel>
-                        <FormControl>
-                          <Input 
-                            type="number" 
-                            min="1" 
-                            max="10" 
-                            className="w-24"
-                            {...field}
-                            onChange={(e) => field.onChange(parseInt(e.target.value))}
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          Higher numbers = higher priority
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                {/* Source Setup Section */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-[#E0E0E0] border-b border-[#333333] pb-2">
-                    Source Setup
-                  </h3>
-                  <FormField
-                    control={form.control}
-                    name="sourceId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Source Channel *</FormLabel>
-                        <div className="flex gap-2">
-                          <Select 
-                            onValueChange={(value) => {
-                              if (value === "add-new") {
-                                setShowNewSourceForm(true);
-                              } else {
-                                field.onChange(value);
-                                setShowNewSourceForm(false);
-                              }
-                            }} 
-                            defaultValue={field.value}
-                          >
-                            <FormControl>
-                              <SelectTrigger className="flex-1">
-                                <SelectValue placeholder="Select or add new source..." />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {sources.filter(s => s.isActive).map((source) => (
-                                <SelectItem key={source.id} value={source.id}>
-                                  {source.chatTitle} ({source.chatType})
-                                </SelectItem>
-                              ))}
-                              <Separator />
-                              <SelectItem value="add-new">+ Add New Source</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  {showNewSourceForm && (
-                    <Card className="p-4 border-[#00B4D8]/30 bg-[#00B4D8]/5">
-                      <div className="space-y-3">
-                        <h4 className="font-medium text-[#00B4D8]">New Source Details</h4>
-                        <div className="grid grid-cols-2 gap-3">
-                          <FormField
-                            control={form.control}
-                            name="newSource.chatTitle"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Chat Title *</FormLabel>
-                                <FormControl>
-                                  <Input placeholder="Channel/Group name" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={form.control}
-                            name="newSource.chatType"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Type *</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                  <FormControl>
-                                    <SelectTrigger>
-                                      <SelectValue placeholder="Select type" />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    <SelectItem value="channel">Channel</SelectItem>
-                                    <SelectItem value="group">Group</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-                        <div className="grid grid-cols-3 gap-3">
-                          <FormField
-                            control={form.control}
-                            name="newSource.phoneNumber"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Phone *</FormLabel>
-                                <FormControl>
-                                  <Input placeholder="+1234567890" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={form.control}
-                            name="newSource.apiId"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>API ID *</FormLabel>
-                                <FormControl>
-                                  <Input placeholder="123456" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={form.control}
-                            name="newSource.apiHash"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>API Hash *</FormLabel>
-                                <FormControl>
-                                  <Input placeholder="abcdef123456..." {...field} />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-                      </div>
-                    </Card>
-                  )}
-                </div>
-
-                {/* Destination Setup Section */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-[#E0E0E0] border-b border-[#333333] pb-2">
-                    Destination Setup
-                  </h3>
-                  <FormField
-                    control={form.control}
-                    name="destinationId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Destination Channel *</FormLabel>
-                        <div className="flex gap-2">
-                          <Select 
-                            onValueChange={(value) => {
-                              if (value === "add-new") {
-                                setShowNewDestinationForm(true);
-                              } else {
-                                field.onChange(value);
-                                setShowNewDestinationForm(false);
-                              }
-                            }} 
-                            defaultValue={field.value}
-                          >
-                            <FormControl>
-                              <SelectTrigger className="flex-1">
-                                <SelectValue placeholder="Select or add new destination..." />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {destinations.filter(d => d.isActive).map((destination) => (
-                                <SelectItem key={destination.id} value={destination.id}>
-                                  {destination.chatTitle} ({destination.chatType})
-                                </SelectItem>
-                              ))}
-                              <Separator />
-                              <SelectItem value="add-new">+ Add New Destination</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  {showNewDestinationForm && (
-                    <Card className="p-4 border-[#00B4D8]/30 bg-[#00B4D8]/5">
-                      <div className="space-y-3">
-                        <h4 className="font-medium text-[#00B4D8]">New Destination Details</h4>
-                        <div className="grid grid-cols-2 gap-3">
-                          <FormField
-                            control={form.control}
-                            name="newDestination.chatTitle"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Chat Title *</FormLabel>
-                                <FormControl>
-                                  <Input placeholder="Channel/Group name" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={form.control}
-                            name="newDestination.chatType"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Type *</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                  <FormControl>
-                                    <SelectTrigger>
-                                      <SelectValue placeholder="Select type" />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    <SelectItem value="channel">Channel</SelectItem>
-                                    <SelectItem value="group">Group</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-                        <div className="grid grid-cols-3 gap-3">
-                          <FormField
-                            control={form.control}
-                            name="newDestination.phoneNumber"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Phone *</FormLabel>
-                                <FormControl>
-                                  <Input placeholder="+1234567890" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={form.control}
-                            name="newDestination.apiId"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>API ID *</FormLabel>
-                                <FormControl>
-                                  <Input placeholder="123456" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={form.control}
-                            name="newDestination.apiHash"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>API Hash *</FormLabel>
-                                <FormControl>
-                                  <Input placeholder="abcdef123456..." {...field} />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-                      </div>
-                    </Card>
-                  )}
-                </div>
-
-                {/* Advanced Settings Toggle */}
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <Checkbox
-                      checked={showAdvanced}
-                      onCheckedChange={setShowAdvanced}
-                      id="advanced-settings"
+                    
+                    <FormField
+                      control={form.control}
+                      name="priority"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-[#E0E0E0]">Priority (1-10)</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="number" 
+                              min="1" 
+                              max="10" 
+                              {...field}
+                              onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
+                              className="bg-[#1E1E1E] border-[#333333] text-[#E0E0E0] focus:border-[#00B4D8] rounded-lg"
+                            />
+                          </FormControl>
+                          <FormDescription className="text-gray-500 text-sm">
+                            Higher numbers = higher priority
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
                     />
-                    <label htmlFor="advanced-settings" className="text-sm font-medium text-[#E0E0E0] cursor-pointer">
-                      Advanced Settings (Filters & Editing)
-                    </label>
+                  </div>
+                </div>
+
+                <Separator className="bg-[#333333]" />
+
+                {/* 2. Source & Destination Block */}
+                <div className="space-y-6">
+                  <div className="flex items-center gap-3 pb-2 border-b border-[#333333]">
+                    <h3 className="text-lg font-semibold text-[#E0E0E0]">Source & Destination</h3>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Source Input Box */}
+                    <Card className="bg-[#1A1A1A] border-[#333333] rounded-lg">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-base text-[#00B4D8]">Source</CardTitle>
+                        <CardDescription className="text-gray-400">Where messages come from</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <FormField
+                          control={form.control}
+                          name="sourceTitle"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-[#E0E0E0]">Chat Title *</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  placeholder="Channel/Group name" 
+                                  {...field} 
+                                  className="bg-[#232323] border-[#333333] text-[#E0E0E0] focus:border-[#00B4D8] rounded-lg"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <div className="grid grid-cols-2 gap-3">
+                          <FormField
+                            control={form.control}
+                            name="sourceType"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-[#E0E0E0]">Type *</FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                  <FormControl>
+                                    <SelectTrigger className="bg-[#232323] border-[#333333] text-[#E0E0E0] focus:border-[#00B4D8] rounded-lg">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent className="bg-[#1E1E1E] border-[#333333]">
+                                    <SelectItem value="channel">Channel</SelectItem>
+                                    <SelectItem value="group">Group</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          
+                          <FormField
+                            control={form.control}
+                            name="sourcePhone"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-[#E0E0E0]">Phone</FormLabel>
+                                <FormControl>
+                                  <Input 
+                                    placeholder="+1234567890" 
+                                    {...field} 
+                                    className="bg-[#232323] border-[#333333] text-[#E0E0E0] focus:border-[#00B4D8] rounded-lg"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Destination Input Box */}
+                    <Card className="bg-[#1A1A1A] border-[#333333] rounded-lg">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-base text-[#00B4D8]">Destination</CardTitle>
+                        <CardDescription className="text-gray-400">Where messages go to</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <FormField
+                          control={form.control}
+                          name="destinationTitle"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-[#E0E0E0]">Chat Title *</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  placeholder="Channel/Group name" 
+                                  {...field} 
+                                  className="bg-[#232323] border-[#333333] text-[#E0E0E0] focus:border-[#00B4D8] rounded-lg"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <div className="grid grid-cols-2 gap-3">
+                          <FormField
+                            control={form.control}
+                            name="destinationType"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-[#E0E0E0]">Type *</FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                  <FormControl>
+                                    <SelectTrigger className="bg-[#232323] border-[#333333] text-[#E0E0E0] focus:border-[#00B4D8] rounded-lg">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent className="bg-[#1E1E1E] border-[#333333]">
+                                    <SelectItem value="channel">Channel</SelectItem>
+                                    <SelectItem value="group">Group</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          
+                          <FormField
+                            control={form.control}
+                            name="destinationPhone"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-[#E0E0E0]">Phone</FormLabel>
+                                <FormControl>
+                                  <Input 
+                                    placeholder="+1234567890" 
+                                    {...field} 
+                                    className="bg-[#232323] border-[#333333] text-[#E0E0E0] focus:border-[#00B4D8] rounded-lg"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+
+                <Separator className="bg-[#333333]" />
+
+                {/* 3. Optional Advanced Settings */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between pb-2 border-b border-[#333333]">
+                    <h3 className="text-lg font-semibold text-[#E0E0E0]">Optional Filters & Settings</h3>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => setShowAdvanced(!showAdvanced)}
+                      className="text-[#00B4D8] hover:bg-[#00B4D8]/10 rounded-lg transition-colors duration-200"
+                    >
+                      {showAdvanced ? (
+                        <>
+                          <ChevronUp className="w-4 h-4 mr-2" />
+                          Hide Advanced Options
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown className="w-4 h-4 mr-2" />
+                          Show Advanced Options
+                        </>
+                      )}
+                    </Button>
                   </div>
                   
                   {showAdvanced && (
-                    <Tabs defaultValue="filters" className="w-full">
-                      <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="filters">Filters</TabsTrigger>
-                        <TabsTrigger value="editing">Editing</TabsTrigger>
-                      </TabsList>
-                  
-                  <TabsContent value="filters" className="space-y-4">
-                    <FormField
-                      control={form.control}
-                      name="includeKeywords"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Include Keywords</FormLabel>
-                          <FormControl>
-                            <Input placeholder="keyword1, keyword2, keyword3" {...field} />
-                          </FormControl>
-                          <FormDescription>
-                            Comma-separated list. Messages must contain these keywords.
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="excludeKeywords"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Exclude Keywords</FormLabel>
-                          <FormControl>
-                            <Input placeholder="spam, ads, promotion" {...field} />
-                          </FormControl>
-                          <FormDescription>
-                            Messages containing these keywords will be blocked.
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="keywordMatchMode"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Match Mode</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="any">Any keyword</SelectItem>
-                                <SelectItem value="all">All keywords</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={form.control}
-                        name="caseSensitive"
-                        render={({ field }) => (
-                          <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                            <FormControl>
-                              <Checkbox
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                              />
-                            </FormControl>
-                            <div className="space-y-1 leading-none">
-                              <FormLabel>Case Sensitive</FormLabel>
-                            </div>
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                    
-                    <FormField
-                      control={form.control}
-                      name="allowedMessageTypes"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Allowed Message Types</FormLabel>
-                          <div className="grid grid-cols-2 gap-2 mt-2">
-                            {messageTypeOptions.map((option) => (
-                              <div key={option.value} className="flex items-center space-x-2">
-                                <Checkbox
-                                  id={option.value}
-                                  checked={field.value?.includes(option.value)}
-                                  onCheckedChange={(checked) => {
-                                    const current = field.value || [];
-                                    if (checked) {
-                                      field.onChange([...current, option.value]);
-                                    } else {
-                                      field.onChange(current.filter((v) => v !== option.value));
-                                    }
-                                  }}
-                                />
-                                <label htmlFor={option.value} className="text-sm">
-                                  {option.label}
-                                </label>
-                              </div>
-                            ))}
+                    <div className="transition-all duration-300 ease-in-out">
+                      <Tabs defaultValue="filters" className="w-full">
+                        <TabsList className="grid w-full grid-cols-2 bg-[#1E1E1E] rounded-lg">
+                          <TabsTrigger 
+                            value="filters" 
+                            className="data-[state=active]:bg-[#00B4D8] data-[state=active]:text-white rounded-lg transition-colors duration-200"
+                          >
+                            Filters
+                          </TabsTrigger>
+                          <TabsTrigger 
+                            value="editing" 
+                            className="data-[state=active]:bg-[#00B4D8] data-[state=active]:text-white rounded-lg transition-colors duration-200"
+                          >
+                            Editing
+                          </TabsTrigger>
+                        </TabsList>
+                        
+                        <TabsContent value="filters" className="mt-6 space-y-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <FormField
+                              control={form.control}
+                              name="includeKeywords"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-[#E0E0E0]">Include Keywords</FormLabel>
+                                  <FormControl>
+                                    <Input 
+                                      placeholder="crypto, trading, news" 
+                                      {...field} 
+                                      className="bg-[#1E1E1E] border-[#333333] text-[#E0E0E0] focus:border-[#00B4D8] rounded-lg"
+                                    />
+                                  </FormControl>
+                                  <FormDescription className="text-gray-500 text-sm">
+                                    Comma-separated list of required keywords
+                                  </FormDescription>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            
+                            <FormField
+                              control={form.control}
+                              name="excludeKeywords"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-[#E0E0E0]">Exclude Keywords</FormLabel>
+                                  <FormControl>
+                                    <Input 
+                                      placeholder="spam, ads, promotion" 
+                                      {...field} 
+                                      className="bg-[#1E1E1E] border-[#333333] text-[#E0E0E0] focus:border-[#00B4D8] rounded-lg"
+                                    />
+                                  </FormControl>
+                                  <FormDescription className="text-gray-500 text-sm">
+                                    Messages with these keywords will be blocked
+                                  </FormDescription>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
                           </div>
-                          <FormDescription>
-                            Leave empty to allow all message types
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="blockUrls"
-                        render={({ field }) => (
-                          <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                            <FormControl>
-                              <Checkbox
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
+
+                          <FormField
+                            control={form.control}
+                            name="allowedMessageTypes"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-[#E0E0E0]">Allowed Message Types</FormLabel>
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-2">
+                                  {messageTypeOptions.map((option) => (
+                                    <div key={option.value} className="flex items-center space-x-2">
+                                      <Checkbox
+                                        id={option.value}
+                                        checked={field.value?.includes(option.value)}
+                                        onCheckedChange={(checked) => {
+                                          const current = field.value || [];
+                                          if (checked) {
+                                            field.onChange([...current, option.value]);
+                                          } else {
+                                            field.onChange(current.filter((v) => v !== option.value));
+                                          }
+                                        }}
+                                        className="border-[#333333] data-[state=checked]:bg-[#00B4D8] data-[state=checked]:border-[#00B4D8]"
+                                      />
+                                      <label 
+                                        htmlFor={option.value} 
+                                        className="text-sm text-[#E0E0E0] cursor-pointer"
+                                      >
+                                        {option.label}
+                                      </label>
+                                    </div>
+                                  ))}
+                                </div>
+                                <FormDescription className="text-gray-500 text-sm">
+                                  Leave empty to allow all message types
+                                </FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          
+                          <div className="grid grid-cols-2 gap-4">
+                            <FormField
+                              control={form.control}
+                              name="blockUrls"
+                              render={({ field }) => (
+                                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-lg border border-[#333333] p-4">
+                                  <FormControl>
+                                    <Checkbox
+                                      checked={field.value}
+                                      onCheckedChange={field.onChange}
+                                      className="border-[#333333] data-[state=checked]:bg-[#00B4D8] data-[state=checked]:border-[#00B4D8]"
+                                    />
+                                  </FormControl>
+                                  <div className="space-y-1 leading-none">
+                                    <FormLabel className="text-[#E0E0E0]">Block URLs</FormLabel>
+                                    <FormDescription className="text-gray-500 text-sm">
+                                      Block messages containing URLs
+                                    </FormDescription>
+                                  </div>
+                                </FormItem>
+                              )}
+                            />
+                            
+                            <FormField
+                              control={form.control}
+                              name="blockForwards"
+                              render={({ field }) => (
+                                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-lg border border-[#333333] p-4">
+                                  <FormControl>
+                                    <Checkbox
+                                      checked={field.value}
+                                      onCheckedChange={field.onChange}
+                                      className="border-[#333333] data-[state=checked]:bg-[#00B4D8] data-[state=checked]:border-[#00B4D8]"
+                                    />
+                                  </FormControl>
+                                  <div className="space-y-1 leading-none">
+                                    <FormLabel className="text-[#E0E0E0]">Block Forwards</FormLabel>
+                                    <FormDescription className="text-gray-500 text-sm">
+                                      Block forwarded messages
+                                    </FormDescription>
+                                  </div>
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                        </TabsContent>
+                        
+                        <TabsContent value="editing" className="mt-6 space-y-4">
+                          <div className="grid grid-cols-1 gap-4">
+                            <FormField
+                              control={form.control}
+                              name="headerText"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-[#E0E0E0]">Header Text</FormLabel>
+                                  <FormControl>
+                                    <Textarea 
+                                      placeholder="Text to add at the beginning of messages" 
+                                      {...field} 
+                                      className="bg-[#1E1E1E] border-[#333333] text-[#E0E0E0] focus:border-[#00B4D8] rounded-lg resize-none"
+                                      rows={3}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            
+                            <FormField
+                              control={form.control}
+                              name="footerText"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-[#E0E0E0]">Footer Text</FormLabel>
+                                  <FormControl>
+                                    <Textarea 
+                                      placeholder="Text to add at the end of messages" 
+                                      {...field} 
+                                      className="bg-[#1E1E1E] border-[#333333] text-[#E0E0E0] focus:border-[#00B4D8] rounded-lg resize-none"
+                                      rows={3}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                              <FormField
+                                control={form.control}
+                                name="removeSenderInfo"
+                                render={({ field }) => (
+                                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-lg border border-[#333333] p-4">
+                                    <FormControl>
+                                      <Checkbox
+                                        checked={field.value}
+                                        onCheckedChange={field.onChange}
+                                        className="border-[#333333] data-[state=checked]:bg-[#00B4D8] data-[state=checked]:border-[#00B4D8]"
+                                      />
+                                    </FormControl>
+                                    <div className="space-y-1 leading-none">
+                                      <FormLabel className="text-[#E0E0E0] text-sm">Remove Sender Info</FormLabel>
+                                    </div>
+                                  </FormItem>
+                                )}
                               />
-                            </FormControl>
-                            <div className="space-y-1 leading-none">
-                              <FormLabel>Block URLs</FormLabel>
-                              <FormDescription>
-                                Block messages containing URLs
-                              </FormDescription>
-                            </div>
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={form.control}
-                        name="blockForwards"
-                        render={({ field }) => (
-                          <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                            <FormControl>
-                              <Checkbox
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
+                              
+                              <FormField
+                                control={form.control}
+                                name="removeUrls"
+                                render={({ field }) => (
+                                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-lg border border-[#333333] p-4">
+                                    <FormControl>
+                                      <Checkbox
+                                        checked={field.value}
+                                        onCheckedChange={field.onChange}
+                                        className="border-[#333333] data-[state=checked]:bg-[#00B4D8] data-[state=checked]:border-[#00B4D8]"
+                                      />
+                                    </FormControl>
+                                    <div className="space-y-1 leading-none">
+                                      <FormLabel className="text-[#E0E0E0] text-sm">Remove URLs</FormLabel>
+                                    </div>
+                                  </FormItem>
+                                )}
                               />
-                            </FormControl>
-                            <div className="space-y-1 leading-none">
-                              <FormLabel>Block Forwards</FormLabel>
-                              <FormDescription>
-                                Block forwarded messages
-                              </FormDescription>
+                              
+                              <FormField
+                                control={form.control}
+                                name="removeHashtags"
+                                render={({ field }) => (
+                                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-lg border border-[#333333] p-4">
+                                    <FormControl>
+                                      <Checkbox
+                                        checked={field.value}
+                                        onCheckedChange={field.onChange}
+                                        className="border-[#333333] data-[state=checked]:bg-[#00B4D8] data-[state=checked]:border-[#00B4D8]"
+                                      />
+                                    </FormControl>
+                                    <div className="space-y-1 leading-none">
+                                      <FormLabel className="text-[#E0E0E0] text-sm">Remove Hashtags</FormLabel>
+                                    </div>
+                                  </FormItem>
+                                )}
+                              />
+                              
+                              <FormField
+                                control={form.control}
+                                name="removeMentions"
+                                render={({ field }) => (
+                                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-lg border border-[#333333] p-4">
+                                    <FormControl>
+                                      <Checkbox
+                                        checked={field.value}
+                                        onCheckedChange={field.onChange}
+                                        className="border-[#333333] data-[state=checked]:bg-[#00B4D8] data-[state=checked]:border-[#00B4D8]"
+                                      />
+                                    </FormControl>
+                                    <div className="space-y-1 leading-none">
+                                      <FormLabel className="text-[#E0E0E0] text-sm">Remove Mentions</FormLabel>
+                                    </div>
+                                  </FormItem>
+                                )}
+                              />
                             </div>
-                          </FormItem>
-                        )}
-                      />
+                          </div>
+                        </TabsContent>
+                      </Tabs>
                     </div>
-                  </TabsContent>
-                  
-                  <TabsContent value="editing" className="space-y-4">
-                    <FormField
-                      control={form.control}
-                      name="headerText"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Header Text</FormLabel>
-                          <FormControl>
-                            <Textarea placeholder="Text to add at the beginning of messages" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="footerText"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Footer Text</FormLabel>
-                          <FormControl>
-                            <Textarea placeholder="Text to add at the end of messages" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="removeSenderInfo"
-                        render={({ field }) => (
-                          <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                            <FormControl>
-                              <Checkbox
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                              />
-                            </FormControl>
-                            <div className="space-y-1 leading-none">
-                              <FormLabel>Remove Sender Info</FormLabel>
-                            </div>
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={form.control}
-                        name="removeUrls"
-                        render={({ field }) => (
-                          <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                            <FormControl>
-                              <Checkbox
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                              />
-                            </FormControl>
-                            <div className="space-y-1 leading-none">
-                              <FormLabel>Remove URLs</FormLabel>
-                            </div>
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={form.control}
-                        name="removeHashtags"
-                        render={({ field }) => (
-                          <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                            <FormControl>
-                              <Checkbox
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                              />
-                            </FormControl>
-                            <div className="space-y-1 leading-none">
-                              <FormLabel>Remove Hashtags</FormLabel>
-                            </div>
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={form.control}
-                        name="removeMentions"
-                        render={({ field }) => (
-                          <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                            <FormControl>
-                              <Checkbox
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                              />
-                            </FormControl>
-                            <div className="space-y-1 leading-none">
-                              <FormLabel>Remove Mentions</FormLabel>
-                            </div>
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                    </TabsContent>
-                  </Tabs>
                   )}
                 </div>
-                
-                <div className="flex justify-end space-x-2 pt-6 border-t border-[#333333]">
+
+                {/* Action Buttons */}
+                <div className="flex justify-end space-x-3 pt-6 border-t border-[#333333]">
                   <Button
                     type="button"
                     variant="outline"
                     onClick={() => {
                       setIsCreateDialogOpen(false);
                       setShowAdvanced(false);
-                      setShowNewSourceForm(false);
-                      setShowNewDestinationForm(false);
                       form.reset();
                     }}
+                    className="border-[#333333] text-[#E0E0E0] hover:bg-[#1E1E1E] rounded-lg"
                   >
                     Cancel
                   </Button>
                   <Button 
                     type="submit" 
                     disabled={createMappingMutation.isPending}
-                    className="bg-[#00B4D8] hover:bg-[#00B4D8]/80 text-white"
+                    className="bg-[#00B4D8] hover:bg-[#00B4D8]/80 text-white rounded-lg min-w-[140px]"
                   >
                     {createMappingMutation.isPending ? "Creating..." : "Create Mapping"}
                   </Button>
@@ -936,26 +811,31 @@ export default function ForwardingPage() {
         </Dialog>
       </div>
 
+      {/* Mappings List */}
       <div className="space-y-4">
         {mappings.map((mapping) => (
-          <Card key={mapping.id}>
+          <Card key={mapping.id} className="bg-[#1A1A1A] border-[#333333] rounded-lg">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-4">
                   <div>
-                    <CardTitle className="text-lg flex items-center">
+                    <CardTitle className="text-lg flex items-center text-[#E0E0E0]">
                       {mapping.sourceName}
-                      <ArrowRight className="w-4 h-4 mx-2" />
+                      <ArrowRight className="w-4 h-4 mx-2 text-[#00B4D8]" />
                       {mapping.destinationName}
                     </CardTitle>
-                    <CardDescription>
+                    <CardDescription className="text-gray-400">
                       Priority: {mapping.priority} • 
                       Created: {new Date(mapping.createdAt).toLocaleDateString()}
                     </CardDescription>
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <Badge variant={mapping.isActive ? "default" : "secondary"}>
+                  <Badge variant={mapping.isActive ? "default" : "secondary"} className={
+                    mapping.isActive 
+                      ? "bg-[#00B4D8] text-white" 
+                      : "bg-gray-600 text-gray-300"
+                  }>
                     {mapping.isActive ? "Active" : "Inactive"}
                   </Badge>
                   <Button
@@ -963,6 +843,7 @@ export default function ForwardingPage() {
                     variant="ghost"
                     onClick={() => handleToggle(mapping.id)}
                     disabled={toggleMappingMutation.isPending}
+                    className="text-[#E0E0E0] hover:bg-[#333333] rounded-lg"
                   >
                     {mapping.isActive ? (
                       <PowerOff className="w-4 h-4" />
@@ -975,6 +856,7 @@ export default function ForwardingPage() {
                     variant="ghost"
                     onClick={() => handleDelete(mapping.id, mapping.sourceName, mapping.destinationName)}
                     disabled={deleteMappingMutation.isPending}
+                    className="text-red-400 hover:bg-red-500/10 rounded-lg"
                   >
                     <Trash2 className="w-4 h-4" />
                   </Button>
@@ -984,11 +866,11 @@ export default function ForwardingPage() {
             <CardContent>
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
-                  <h4 className="font-medium flex items-center mb-2">
-                    <Filter className="w-4 h-4 mr-2" />
+                  <h4 className="font-medium flex items-center mb-2 text-[#E0E0E0]">
+                    <Filter className="w-4 h-4 mr-2 text-[#00B4D8]" />
                     Filters
                   </h4>
-                  <div className="space-y-1 text-sm text-muted-foreground">
+                  <div className="space-y-1 text-sm text-gray-400">
                     {mapping.filters.includeKeywords.length > 0 && (
                       <div>Include: {mapping.filters.includeKeywords.join(", ")}</div>
                     )}
@@ -1003,11 +885,11 @@ export default function ForwardingPage() {
                   </div>
                 </div>
                 <div>
-                  <h4 className="font-medium flex items-center mb-2">
-                    <Settings className="w-4 h-4 mr-2" />
+                  <h4 className="font-medium flex items-center mb-2 text-[#E0E0E0]">
+                    <Settings className="w-4 h-4 mr-2 text-[#00B4D8]" />
                     Editing
                   </h4>
-                  <div className="space-y-1 text-sm text-muted-foreground">
+                  <div className="space-y-1 text-sm text-gray-400">
                     {mapping.editing.headerText && (
                       <div>Header: "{mapping.editing.headerText}"</div>
                     )}
@@ -1027,19 +909,20 @@ export default function ForwardingPage() {
       </div>
 
       {mappings.length === 0 && (
-        <Card>
-          <CardContent className="py-8">
+        <Card className="bg-[#1A1A1A] border-[#333333] rounded-lg">
+          <CardContent className="py-12">
             <div className="text-center space-y-4">
-              <ArrowRight className="w-12 h-12 mx-auto text-muted-foreground" />
+              <ArrowRight className="w-12 h-12 mx-auto text-gray-600" />
               <div>
-                <h3 className="text-lg font-medium">No forwarding mappings</h3>
-                <p className="text-muted-foreground">
-                  Create your first forwarding mapping to start routing messages
-                </p>
+                <h3 className="text-lg font-medium text-[#E0E0E0]">No forwarding mappings</h3>
+                <p className="text-gray-400 mt-1">Create your first mapping to start forwarding messages</p>
               </div>
-              <Button onClick={() => setIsCreateDialogOpen(true)}>
+              <Button 
+                onClick={() => setIsCreateDialogOpen(true)}
+                className="bg-[#00B4D8] hover:bg-[#00B4D8]/80 text-white rounded-lg"
+              >
                 <Plus className="w-4 h-4 mr-2" />
-                Create Mapping
+                Create Your First Mapping
               </Button>
             </div>
           </CardContent>
