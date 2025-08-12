@@ -33,7 +33,16 @@ import {
   type AccountForwardingMapping, type InsertAccountForwardingMapping,
   type SessionBackup, type InsertSessionBackup,
   type SyncEvent, type InsertSyncEvent,
-  type AccountStatusInfo, type TeamInfo, type SessionHealthReport, type ReauthWorkflowStatus
+  type AccountStatusInfo, type TeamInfo, type SessionHealthReport, type ReauthWorkflowStatus,
+  // Phase 6 imports
+  type WorkerTask, type InsertWorkerTask,
+  type SessionAssignment, type InsertSessionAssignment,
+  type SessionQueue, type InsertSessionQueue,
+  type WorkerAnalytics, type InsertWorkerAnalytics,
+  type ScalingEvent, type InsertScalingEvent,
+  type WorkerControl, type InsertWorkerControl,
+  type WorkerSystemStatus, type WorkerNodeInfo, type SessionAssignmentInfo, 
+  type QueuedSessionInfo, type WorkerLoadBalanceResult
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -241,6 +250,67 @@ export interface IStorage {
   getUnprocessedSyncEvents(userId?: string): Promise<SyncEvent[]>;
   markSyncEventProcessed(eventId: string): Promise<void>;
   processSyncEvents(userId: string): Promise<void>;
+
+  // Phase 6: Distributed Worker System
+  
+  // Worker Task Management
+  createWorkerTask(task: InsertWorkerTask): Promise<WorkerTask>;
+  getWorkerTask(id: string): Promise<WorkerTask | undefined>;
+  getWorkerTasksByWorkerId(workerId: string): Promise<WorkerTask[]>;
+  getPendingWorkerTasks(): Promise<WorkerTask[]>;
+  updateWorkerTask(id: string, updates: Partial<WorkerTask>): Promise<WorkerTask | undefined>;
+  deleteWorkerTask(id: string): Promise<boolean>;
+  
+  // Session Assignment & Load Balancing
+  createSessionAssignment(assignment: InsertSessionAssignment): Promise<SessionAssignment>;
+  getSessionAssignment(id: string): Promise<SessionAssignment | undefined>;
+  getSessionAssignmentBySessionId(sessionId: string): Promise<SessionAssignment | undefined>;
+  getSessionAssignmentsByWorkerId(workerId: string): Promise<SessionAssignment[]>;
+  getSessionAssignmentsByUserId(userId: string): Promise<SessionAssignment[]>;
+  updateSessionAssignment(id: string, updates: Partial<SessionAssignment>): Promise<SessionAssignment | undefined>;
+  deleteSessionAssignment(id: string): Promise<boolean>;
+  getAllSessionAssignments(): Promise<SessionAssignment[]>;
+  
+  // Session Queue Management
+  createSessionQueue(queueItem: InsertSessionQueue): Promise<SessionQueue>;
+  getSessionQueueItem(id: string): Promise<SessionQueue | undefined>;
+  getSessionQueueByUserId(userId: string): Promise<SessionQueue[]>;
+  getQueuedSessions(): Promise<SessionQueue[]>;
+  updateSessionQueue(id: string, updates: Partial<SessionQueue>): Promise<SessionQueue | undefined>;
+  deleteSessionQueue(id: string): Promise<boolean>;
+  processSessionQueue(): Promise<QueuedSessionInfo[]>;
+  
+  // Worker Analytics
+  createWorkerAnalytics(analytics: InsertWorkerAnalytics): Promise<WorkerAnalytics>;
+  getWorkerAnalytics(workerId: string, startDate: Date, endDate: Date): Promise<WorkerAnalytics[]>;
+  getWorkerAnalyticsById(id: string): Promise<WorkerAnalytics | undefined>;
+  deleteWorkerAnalytics(id: string): Promise<boolean>;
+  
+  // Scaling Events
+  createScalingEvent(event: InsertScalingEvent): Promise<ScalingEvent>;
+  getScalingEvents(limit?: number): Promise<ScalingEvent[]>;
+  getRecentScalingEvent(): Promise<ScalingEvent | undefined>;
+  deleteScalingEvent(id: string): Promise<boolean>;
+  
+  // Worker Controls
+  createWorkerControl(control: InsertWorkerControl): Promise<WorkerControl>;
+  getWorkerControl(id: string): Promise<WorkerControl | undefined>;
+  getWorkerControlsByWorkerId(workerId: string): Promise<WorkerControl[]>;
+  getPendingWorkerControls(): Promise<WorkerControl[]>;
+  updateWorkerControl(id: string, updates: Partial<WorkerControl>): Promise<WorkerControl | undefined>;
+  deleteWorkerControl(id: string): Promise<boolean>;
+  
+  // Phase 6: System Status & Load Balancing
+  getWorkerSystemStatus(): Promise<WorkerSystemStatus>;
+  getAvailableWorkers(): Promise<WorkerNodeInfo[]>;
+  getWorkerNodeInfo(workerId: string): Promise<WorkerNodeInfo | undefined>;
+  assignSessionToWorker(sessionId: string, userId: string): Promise<WorkerLoadBalanceResult>;
+  reassignSession(sessionId: string, newWorkerId: string): Promise<boolean>;
+  getSessionAssignmentInfo(sessionId: string): Promise<SessionAssignmentInfo | undefined>;
+  getQueuedSessionsInfo(): Promise<QueuedSessionInfo[]>;
+  calculateWorkerLoadScore(workerId: string): Promise<number>;
+  checkWorkerCapacity(workerId: string): Promise<boolean>;
+  triggerScalingCheck(): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -280,6 +350,14 @@ export class MemStorage implements IStorage {
   private accountForwardingMappings: Map<string, AccountForwardingMapping> = new Map();
   private sessionBackups: Map<string, SessionBackup> = new Map();
   private syncEvents: Map<string, SyncEvent> = new Map();
+
+  // Phase 6 storage
+  private workerTasks: Map<string, WorkerTask> = new Map();
+  private sessionAssignments: Map<string, SessionAssignment> = new Map();
+  private sessionQueue: Map<string, SessionQueue> = new Map();
+  private workerAnalytics: Map<string, WorkerAnalytics> = new Map();
+  private scalingEvents: Map<string, ScalingEvent> = new Map();
+  private workerControls: Map<string, WorkerControl> = new Map();
 
   constructor() {
     // Initialize with some default settings
@@ -322,13 +400,26 @@ export class MemStorage implements IStorage {
       this.workers.set(id, {
         id,
         name: worker.name,
+        workerId: `worker-${id.substring(0, 8)}`,
+        serverAddress: `192.168.1.${Math.floor(Math.random() * 100) + 100}`,
         status: worker.status as any,
+        totalRam: 2048,
+        usedRam: Math.floor(2048 * (worker.memoryUsage / 100)),
         cpuUsage: worker.cpuUsage,
-        memoryUsage: worker.memoryUsage,
+        maxSessions: 20,
         activeSessions: worker.activeSessions,
+        loadScore: Math.floor((worker.cpuUsage + worker.memoryUsage) / 2),
+        pingLatency: Math.floor(Math.random() * 50) + 10,
         messagesPerHour: worker.messagesPerHour,
+        ramThreshold: 1536,
+        priority: 1,
+        authToken: `token-${randomUUID()}`,
         lastHeartbeat: worker.status === "online" ? new Date() : null,
+        lastTaskAssigned: null,
+        connectionCount: worker.status === "online" ? 1 : 0,
+        workerVersion: "1.0.0",
         config: {},
+        metadata: {},
         createdAt: new Date(),
         updatedAt: new Date(),
       });
@@ -447,12 +538,22 @@ export class MemStorage implements IStorage {
       ...insertWorker,
       id,
       status: insertWorker.status || 'offline',
+      totalRam: insertWorker.totalRam || 2048,
+      usedRam: insertWorker.usedRam || 0,
       cpuUsage: insertWorker.cpuUsage || 0,
-      memoryUsage: insertWorker.memoryUsage || 0,
+      maxSessions: insertWorker.maxSessions || 20,
       activeSessions: insertWorker.activeSessions || 0,
+      loadScore: insertWorker.loadScore || 0,
+      pingLatency: insertWorker.pingLatency || 0,
       messagesPerHour: insertWorker.messagesPerHour || 0,
+      ramThreshold: insertWorker.ramThreshold || 1536,
+      priority: insertWorker.priority || 1,
       lastHeartbeat: insertWorker.lastHeartbeat || null,
+      lastTaskAssigned: insertWorker.lastTaskAssigned || null,
+      connectionCount: insertWorker.connectionCount || 0,
+      workerVersion: insertWorker.workerVersion || "1.0.0",
       config: insertWorker.config || {},
+      metadata: insertWorker.metadata || {},
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -576,7 +677,7 @@ export class MemStorage implements IStorage {
       : 0;
     
     const avgMemory = onlineWorkers.length > 0
-      ? Math.round(onlineWorkers.reduce((sum, w) => sum + w.memoryUsage, 0) / onlineWorkers.length)
+      ? Math.round(onlineWorkers.reduce((sum, w) => sum + Math.floor((w.usedRam / w.totalRam) * 100), 0) / onlineWorkers.length)
       : 0;
 
     return {
@@ -1845,6 +1946,591 @@ export class MemStorage implements IStorage {
     for (const event of events) {
       // Process each event based on type
       await this.markSyncEventProcessed(event.id);
+    }
+  }
+
+  // Phase 6: Distributed Worker System Implementation
+  
+  // Worker Task Management
+  async createWorkerTask(insertTask: InsertWorkerTask): Promise<WorkerTask> {
+    const id = randomUUID();
+    const task: WorkerTask = {
+      ...insertTask,
+      id,
+      status: insertTask.status || 'pending',
+      priority: insertTask.priority || 1,
+      retryCount: 0,
+      maxRetries: insertTask.maxRetries || 3,
+      assignedAt: insertTask.assignedAt || null,
+      startedAt: insertTask.startedAt || null,
+      completedAt: insertTask.completedAt || null,
+      result: insertTask.result || null,
+      errorMessage: insertTask.errorMessage || null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.workerTasks.set(id, task);
+    return task;
+  }
+
+  async getWorkerTask(id: string): Promise<WorkerTask | undefined> {
+    return this.workerTasks.get(id);
+  }
+
+  async getWorkerTasksByWorkerId(workerId: string): Promise<WorkerTask[]> {
+    return Array.from(this.workerTasks.values()).filter(task => task.workerId === workerId);
+  }
+
+  async getPendingWorkerTasks(): Promise<WorkerTask[]> {
+    return Array.from(this.workerTasks.values()).filter(task => task.status === 'pending');
+  }
+
+  async updateWorkerTask(id: string, updates: Partial<WorkerTask>): Promise<WorkerTask | undefined> {
+    const task = this.workerTasks.get(id);
+    if (!task) return undefined;
+    
+    const updatedTask = { ...task, ...updates, updatedAt: new Date() };
+    this.workerTasks.set(id, updatedTask);
+    return updatedTask;
+  }
+
+  async deleteWorkerTask(id: string): Promise<boolean> {
+    return this.workerTasks.delete(id);
+  }
+
+  // Session Assignment & Load Balancing
+  async createSessionAssignment(insertAssignment: InsertSessionAssignment): Promise<SessionAssignment> {
+    const id = randomUUID();
+    const assignment: SessionAssignment = {
+      ...insertAssignment,
+      id,
+      status: insertAssignment.status || 'assigned',
+      priority: insertAssignment.priority || 1,
+      messagesProcessed: 0,
+      ramUsageMb: 0,
+      avgProcessingTime: 0,
+      assignedAt: new Date(),
+      activatedAt: insertAssignment.activatedAt || null,
+      lastMigration: insertAssignment.lastMigration || null,
+      lastHeartbeat: insertAssignment.lastHeartbeat || null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.sessionAssignments.set(id, assignment);
+    return assignment;
+  }
+
+  async getSessionAssignment(id: string): Promise<SessionAssignment | undefined> {
+    return this.sessionAssignments.get(id);
+  }
+
+  async getSessionAssignmentBySessionId(sessionId: string): Promise<SessionAssignment | undefined> {
+    return Array.from(this.sessionAssignments.values()).find(assignment => assignment.sessionId === sessionId);
+  }
+
+  async getSessionAssignmentsByWorkerId(workerId: string): Promise<SessionAssignment[]> {
+    return Array.from(this.sessionAssignments.values()).filter(assignment => assignment.workerId === workerId);
+  }
+
+  async getSessionAssignmentsByUserId(userId: string): Promise<SessionAssignment[]> {
+    return Array.from(this.sessionAssignments.values()).filter(assignment => assignment.userId === userId);
+  }
+
+  async updateSessionAssignment(id: string, updates: Partial<SessionAssignment>): Promise<SessionAssignment | undefined> {
+    const assignment = this.sessionAssignments.get(id);
+    if (!assignment) return undefined;
+    
+    const updatedAssignment = { ...assignment, ...updates, updatedAt: new Date() };
+    this.sessionAssignments.set(id, updatedAssignment);
+    return updatedAssignment;
+  }
+
+  async deleteSessionAssignment(id: string): Promise<boolean> {
+    return this.sessionAssignments.delete(id);
+  }
+
+  async getAllSessionAssignments(): Promise<SessionAssignment[]> {
+    return Array.from(this.sessionAssignments.values());
+  }
+
+  // Session Queue Management
+  async createSessionQueue(insertQueue: InsertSessionQueue): Promise<SessionQueue> {
+    const id = randomUUID();
+    const queueItem: SessionQueue = {
+      ...insertQueue,
+      id,
+      status: insertQueue.status || 'queued',
+      priority: insertQueue.priority || 1,
+      queuedAt: new Date(),
+      processedAt: insertQueue.processedAt || null,
+      expiredAt: insertQueue.expiredAt || null,
+      notificationSent: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.sessionQueue.set(id, queueItem);
+    return queueItem;
+  }
+
+  async getSessionQueueItem(id: string): Promise<SessionQueue | undefined> {
+    return this.sessionQueue.get(id);
+  }
+
+  async getSessionQueueByUserId(userId: string): Promise<SessionQueue[]> {
+    return Array.from(this.sessionQueue.values()).filter(item => item.userId === userId);
+  }
+
+  async getQueuedSessions(): Promise<SessionQueue[]> {
+    return Array.from(this.sessionQueue.values()).filter(item => item.status === 'queued');
+  }
+
+  async updateSessionQueue(id: string, updates: Partial<SessionQueue>): Promise<SessionQueue | undefined> {
+    const queueItem = this.sessionQueue.get(id);
+    if (!queueItem) return undefined;
+    
+    const updatedItem = { ...queueItem, ...updates, updatedAt: new Date() };
+    this.sessionQueue.set(id, updatedItem);
+    return updatedItem;
+  }
+
+  async deleteSessionQueue(id: string): Promise<boolean> {
+    return this.sessionQueue.delete(id);
+  }
+
+  async processSessionQueue(): Promise<QueuedSessionInfo[]> {
+    const queuedItems = await this.getQueuedSessions();
+    const queueInfo: QueuedSessionInfo[] = [];
+    
+    for (const item of queuedItems) {
+      const session = await this.getTelegramSession(item.sessionId);
+      const user = await this.getUser(item.userId);
+      
+      if (session && user) {
+        queueInfo.push({
+          sessionId: item.sessionId,
+          sessionName: session.sessionName,
+          userId: item.userId,
+          username: user.username,
+          userType: user.userType,
+          queuePosition: item.queuePosition,
+          estimatedWaitTime: item.estimatedWaitTime,
+          priority: item.priority,
+          status: item.status,
+          queuedAt: item.queuedAt.toISOString(),
+        });
+      }
+    }
+    
+    return queueInfo.sort((a, b) => a.queuePosition - b.queuePosition);
+  }
+
+  // Worker Analytics
+  async createWorkerAnalytics(insertAnalytics: InsertWorkerAnalytics): Promise<WorkerAnalytics> {
+    const id = randomUUID();
+    const analytics: WorkerAnalytics = {
+      ...insertAnalytics,
+      id,
+      totalSessions: insertAnalytics.totalSessions || 0,
+      totalMessages: insertAnalytics.totalMessages || 0,
+      avgCpuUsage: insertAnalytics.avgCpuUsage || 0,
+      avgRamUsage: insertAnalytics.avgRamUsage || 0,
+      maxRamUsage: insertAnalytics.maxRamUsage || 0,
+      uptime: insertAnalytics.uptime || 0,
+      crashCount: insertAnalytics.crashCount || 0,
+      reconnectCount: insertAnalytics.reconnectCount || 0,
+      avgResponseTime: insertAnalytics.avgResponseTime || 0,
+      premiumSessions: insertAnalytics.premiumSessions || 0,
+      freeSessions: insertAnalytics.freeSessions || 0,
+      createdAt: new Date(),
+    };
+    this.workerAnalytics.set(id, analytics);
+    return analytics;
+  }
+
+  async getWorkerAnalytics(workerId: string, startDate: Date, endDate: Date): Promise<WorkerAnalytics[]> {
+    return Array.from(this.workerAnalytics.values()).filter(analytics => 
+      analytics.workerId === workerId &&
+      analytics.periodStart >= startDate &&
+      analytics.periodEnd <= endDate
+    );
+  }
+
+  async getWorkerAnalyticsById(id: string): Promise<WorkerAnalytics | undefined> {
+    return this.workerAnalytics.get(id);
+  }
+
+  async deleteWorkerAnalytics(id: string): Promise<boolean> {
+    return this.workerAnalytics.delete(id);
+  }
+
+  // Scaling Events
+  async createScalingEvent(insertEvent: InsertScalingEvent): Promise<ScalingEvent> {
+    const id = randomUUID();
+    const event: ScalingEvent = {
+      ...insertEvent,
+      id,
+      actionTaken: insertEvent.actionTaken || null,
+      actionResult: insertEvent.actionResult || null,
+      adminNotified: insertEvent.adminNotified || false,
+      createdAt: new Date(),
+    };
+    this.scalingEvents.set(id, event);
+    return event;
+  }
+
+  async getScalingEvents(limit = 50): Promise<ScalingEvent[]> {
+    const events = Array.from(this.scalingEvents.values())
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    return events.slice(0, limit);
+  }
+
+  async getRecentScalingEvent(): Promise<ScalingEvent | undefined> {
+    const events = await this.getScalingEvents(1);
+    return events[0];
+  }
+
+  async deleteScalingEvent(id: string): Promise<boolean> {
+    return this.scalingEvents.delete(id);
+  }
+
+  // Worker Controls
+  async createWorkerControl(insertControl: InsertWorkerControl): Promise<WorkerControl> {
+    const id = randomUUID();
+    const control: WorkerControl = {
+      ...insertControl,
+      id,
+      status: insertControl.status || 'pending',
+      executedAt: insertControl.executedAt || null,
+      result: insertControl.result || null,
+      errorMessage: insertControl.errorMessage || null,
+      actionData: insertControl.actionData || null,
+      createdAt: new Date(),
+    };
+    this.workerControls.set(id, control);
+    return control;
+  }
+
+  async getWorkerControl(id: string): Promise<WorkerControl | undefined> {
+    return this.workerControls.get(id);
+  }
+
+  async getWorkerControlsByWorkerId(workerId: string): Promise<WorkerControl[]> {
+    return Array.from(this.workerControls.values()).filter(control => control.workerId === workerId);
+  }
+
+  async getPendingWorkerControls(): Promise<WorkerControl[]> {
+    return Array.from(this.workerControls.values()).filter(control => control.status === 'pending');
+  }
+
+  async updateWorkerControl(id: string, updates: Partial<WorkerControl>): Promise<WorkerControl | undefined> {
+    const control = this.workerControls.get(id);
+    if (!control) return undefined;
+    
+    const updatedControl = { ...control, ...updates };
+    this.workerControls.set(id, updatedControl);
+    return updatedControl;
+  }
+
+  async deleteWorkerControl(id: string): Promise<boolean> {
+    return this.workerControls.delete(id);
+  }
+
+  // Phase 6: System Status & Load Balancing
+  async getWorkerSystemStatus(): Promise<WorkerSystemStatus> {
+    const workers = await this.getAllWorkers();
+    const onlineWorkers = workers.filter(w => w.status === 'online');
+    const sessions = await this.getAllTelegramSessions();
+    const activeSessions = sessions.filter(s => s.status === 'active');
+    const queuedSessions = await this.getQueuedSessions();
+    
+    const totalRam = onlineWorkers.reduce((sum, w) => sum + w.totalRam, 0);
+    const usedRam = onlineWorkers.reduce((sum, w) => sum + w.usedRam, 0);
+    const avgLoadScore = onlineWorkers.length > 0 
+      ? Math.round(onlineWorkers.reduce((sum, w) => sum + w.loadScore, 0) / onlineWorkers.length)
+      : 0;
+    
+    const lastScalingEvent = await this.getRecentScalingEvent();
+
+    return {
+      totalWorkers: workers.length,
+      onlineWorkers: onlineWorkers.length,
+      totalSessions: activeSessions.length,
+      queuedSessions: queuedSessions.length,
+      avgLoadScore,
+      systemCapacity: {
+        totalRam,
+        usedRam,
+        utilizationPercent: totalRam > 0 ? Math.round((usedRam / totalRam) * 100) : 0,
+      },
+      lastScalingEvent: lastScalingEvent ? {
+        type: lastScalingEvent.eventType,
+        trigger: lastScalingEvent.trigger,
+        timestamp: lastScalingEvent.createdAt.toISOString(),
+      } : undefined,
+    };
+  }
+
+  async getAvailableWorkers(): Promise<WorkerNodeInfo[]> {
+    const workers = await this.getAllWorkers();
+    const onlineWorkers = workers.filter(w => w.status === 'online');
+    
+    const workerInfos: WorkerNodeInfo[] = [];
+    for (const worker of onlineWorkers) {
+      const assignments = await this.getSessionAssignmentsByWorkerId(worker.id);
+      const activeAssignments = assignments.filter(a => a.status === 'active');
+      
+      workerInfos.push({
+        id: worker.id,
+        workerId: worker.workerId,
+        name: worker.name,
+        serverAddress: worker.serverAddress,
+        status: worker.status,
+        resources: {
+          totalRam: worker.totalRam,
+          usedRam: worker.usedRam,
+          ramPercent: Math.round((worker.usedRam / worker.totalRam) * 100),
+          cpuUsage: worker.cpuUsage,
+        },
+        capacity: {
+          maxSessions: worker.maxSessions,
+          activeSessions: activeAssignments.length,
+          availableSlots: worker.maxSessions - activeAssignments.length,
+        },
+        performance: {
+          loadScore: worker.loadScore,
+          pingLatency: worker.pingLatency,
+          messagesPerHour: worker.messagesPerHour,
+          uptime: Math.floor((Date.now() - worker.createdAt.getTime()) / 1000),
+        },
+        lastHeartbeat: worker.lastHeartbeat?.toISOString(),
+      });
+    }
+    
+    return workerInfos.sort((a, b) => a.performance.loadScore - b.performance.loadScore);
+  }
+
+  async getWorkerNodeInfo(workerId: string): Promise<WorkerNodeInfo | undefined> {
+    const worker = await this.getWorker(workerId);
+    if (!worker) return undefined;
+    
+    const assignments = await this.getSessionAssignmentsByWorkerId(workerId);
+    const activeAssignments = assignments.filter(a => a.status === 'active');
+    
+    return {
+      id: worker.id,
+      workerId: worker.workerId,
+      name: worker.name,
+      serverAddress: worker.serverAddress,
+      status: worker.status,
+      resources: {
+        totalRam: worker.totalRam,
+        usedRam: worker.usedRam,
+        ramPercent: Math.round((worker.usedRam / worker.totalRam) * 100),
+        cpuUsage: worker.cpuUsage,
+      },
+      capacity: {
+        maxSessions: worker.maxSessions,
+        activeSessions: activeAssignments.length,
+        availableSlots: worker.maxSessions - activeAssignments.length,
+      },
+      performance: {
+        loadScore: worker.loadScore,
+        pingLatency: worker.pingLatency,
+        messagesPerHour: worker.messagesPerHour,
+        uptime: Math.floor((Date.now() - worker.createdAt.getTime()) / 1000),
+      },
+      lastHeartbeat: worker.lastHeartbeat?.toISOString(),
+    };
+  }
+
+  async assignSessionToWorker(sessionId: string, userId: string): Promise<WorkerLoadBalanceResult> {
+    const session = await this.getTelegramSession(sessionId);
+    const user = await this.getUser(userId);
+    
+    if (!session || !user) {
+      return {
+        success: false,
+        reason: "Session or user not found",
+        loadBalanceStrategy: "immediate",
+      };
+    }
+
+    // Check if session is already assigned
+    const existingAssignment = await this.getSessionAssignmentBySessionId(sessionId);
+    if (existingAssignment) {
+      return {
+        success: false,
+        reason: "Session already assigned",
+        loadBalanceStrategy: "immediate",
+      };
+    }
+
+    // Get available workers sorted by load score
+    const availableWorkers = await this.getAvailableWorkers();
+    const suitableWorkers = availableWorkers.filter(w => w.capacity.availableSlots > 0);
+
+    if (suitableWorkers.length === 0) {
+      // Queue the session
+      const queuePosition = (await this.getQueuedSessions()).length + 1;
+      const priority = user.userType === 'premium' ? 3 : user.userType === 'admin' ? 5 : 1;
+      
+      await this.createSessionQueue({
+        userId,
+        sessionId,
+        priority,
+        queuePosition,
+        estimatedWaitTime: queuePosition * 5, // 5 minutes per position
+      });
+
+      return {
+        success: false,
+        queuePosition,
+        estimatedWaitTime: queuePosition * 5,
+        reason: "No available workers - session queued",
+        loadBalanceStrategy: "queued",
+      };
+    }
+
+    // Find best worker for this user type
+    let selectedWorker;
+    if (user.userType === 'premium' || user.userType === 'admin') {
+      // Premium users get the best available worker
+      selectedWorker = suitableWorkers[0];
+    } else {
+      // Free users get workers with more capacity but not necessarily the best
+      selectedWorker = suitableWorkers.find(w => w.capacity.availableSlots > 5) || suitableWorkers[0];
+    }
+
+    // Create assignment
+    const priority = user.userType === 'premium' ? 3 : user.userType === 'admin' ? 5 : 1;
+    const assignment = await this.createSessionAssignment({
+      sessionId,
+      workerId: selectedWorker.id,
+      userId,
+      assignmentType: 'automatic',
+      priority,
+    });
+
+    // Update session with worker assignment
+    await this.updateTelegramSession(sessionId, { workerId: selectedWorker.id });
+
+    return {
+      success: true,
+      assignedWorkerId: selectedWorker.id,
+      workerName: selectedWorker.name,
+      reason: `Assigned to ${selectedWorker.name} (Load: ${selectedWorker.performance.loadScore}%)`,
+      loadBalanceStrategy: "immediate",
+    };
+  }
+
+  async reassignSession(sessionId: string, newWorkerId: string): Promise<boolean> {
+    const assignment = await this.getSessionAssignmentBySessionId(sessionId);
+    if (!assignment) return false;
+
+    const newWorker = await this.getWorker(newWorkerId);
+    if (!newWorker) return false;
+
+    // Check capacity
+    const hasCapacity = await this.checkWorkerCapacity(newWorkerId);
+    if (!hasCapacity) return false;
+
+    // Update assignment
+    await this.updateSessionAssignment(assignment.id, {
+      workerId: newWorkerId,
+      assignmentType: 'manual',
+      lastMigration: new Date(),
+    });
+
+    // Update session
+    await this.updateTelegramSession(sessionId, { workerId: newWorkerId });
+
+    return true;
+  }
+
+  async getSessionAssignmentInfo(sessionId: string): Promise<SessionAssignmentInfo | undefined> {
+    const assignment = await this.getSessionAssignmentBySessionId(sessionId);
+    if (!assignment) return undefined;
+
+    const session = await this.getTelegramSession(sessionId);
+    const user = await this.getUser(assignment.userId);
+    const worker = await this.getWorker(assignment.workerId);
+
+    if (!session || !user || !worker) return undefined;
+
+    return {
+      sessionId: assignment.sessionId,
+      sessionName: session.sessionName,
+      userId: assignment.userId,
+      username: user.username,
+      workerId: assignment.workerId,
+      workerName: worker.name,
+      assignmentType: assignment.assignmentType,
+      status: assignment.status,
+      priority: assignment.priority,
+      performance: {
+        messagesProcessed: assignment.messagesProcessed,
+        ramUsageMb: assignment.ramUsageMb,
+        avgProcessingTime: assignment.avgProcessingTime,
+      },
+      assignedAt: assignment.assignedAt.toISOString(),
+      lastActivity: assignment.lastHeartbeat?.toISOString(),
+    };
+  }
+
+  async getQueuedSessionsInfo(): Promise<QueuedSessionInfo[]> {
+    return await this.processSessionQueue();
+  }
+
+  async calculateWorkerLoadScore(workerId: string): Promise<number> {
+    const worker = await this.getWorker(workerId);
+    if (!worker) return 100;
+
+    const ramPercent = (worker.usedRam / worker.totalRam) * 100;
+    const cpuPercent = worker.cpuUsage;
+    const sessionPercent = (worker.activeSessions / worker.maxSessions) * 100;
+
+    // Weighted load score: RAM (40%), CPU (30%), Sessions (30%)
+    const loadScore = Math.round((ramPercent * 0.4) + (cpuPercent * 0.3) + (sessionPercent * 0.3));
+    
+    // Update worker with new load score
+    await this.updateWorker(workerId, { loadScore });
+    
+    return Math.min(loadScore, 100);
+  }
+
+  async checkWorkerCapacity(workerId: string): Promise<boolean> {
+    const worker = await this.getWorker(workerId);
+    if (!worker || worker.status !== 'online') return false;
+
+    const assignments = await this.getSessionAssignmentsByWorkerId(workerId);
+    const activeAssignments = assignments.filter(a => a.status === 'active');
+
+    // Check session capacity
+    if (activeAssignments.length >= worker.maxSessions) return false;
+
+    // Check RAM capacity
+    if (worker.usedRam >= worker.ramThreshold) return false;
+
+    return true;
+  }
+
+  async triggerScalingCheck(): Promise<void> {
+    const systemStatus = await this.getWorkerSystemStatus();
+    const queuedSessions = await this.getQueuedSessions();
+    
+    // Check if scaling is needed
+    if (queuedSessions.length > 5 || systemStatus.systemCapacity.utilizationPercent > 85) {
+      await this.createScalingEvent({
+        eventType: 'overflow_detected',
+        trigger: queuedSessions.length > 5 ? 'high_queue' : 'high_load',
+        description: `System overload detected: ${queuedSessions.length} queued sessions, ${systemStatus.systemCapacity.utilizationPercent}% RAM usage`,
+        totalWorkers: systemStatus.totalWorkers,
+        totalSessions: systemStatus.totalSessions,
+        queuedSessions: queuedSessions.length,
+        avgLoadScore: systemStatus.avgLoadScore,
+        actionTaken: 'Admin notification sent',
+        actionResult: 'success',
+      });
     }
   }
 }

@@ -1,0 +1,120 @@
+🚀 Prompt: Phase 6 Development – Scalable Worker System & RAM Optimization
+
+Objective:
+Implement a scalable, intelligent worker system for AutoForwardX that dynamically distributes user sessions and forwarding tasks across multiple VPS-based worker nodes. Ensure high availability, optimized RAM usage, and premium user prioritization.
+
+Key Functional Areas:
+
+Dynamic Worker Management
+
+Enable main server to register, monitor, and deregister worker nodes via a secure channel (WebSocket/Socket.IO or REST-based heartbeat).
+
+Each worker node reports:
+
+Worker ID
+
+Total RAM & current usage
+
+Number of active sessions
+
+Ping latency
+
+Load score (RAM weight + CPU usage)
+
+Workers must auto-reconnect on disconnection/crash.
+
+Load-Based Session Assignment
+
+When a user starts forwarding:
+
+Select the most appropriate worker based on available RAM and load score.
+
+Premium users get top-priority placement (lowest-latency, lowest-load worker).
+
+Free users are assigned to idle or less powerful workers.
+
+Allow admin to set thresholds (e.g., max 1.5GB RAM per worker or 20 sessions max).
+
+Fallback Logic & Overflow Control
+
+If no workers have available capacity:
+
+Queue free-user sessions with delayed start.
+
+Premium sessions trigger overflow to a new worker instance if available.
+
+Implement notification system (email/Telegram alert) to admin when scaling is required.
+
+RAM-Efficient Session Design
+
+Clients remain connected but idle (no polling when idle).
+
+Reuse clients instead of restarting Telethon sessions unless reauth is required.
+
+Use psutil (or similar) to track session-wise RAM usage.
+
+Implement a memory cleanup task every X minutes to unload inactive sessions.
+
+Worker-Server Communication
+
+Worker registers itself with main server and gets assigned tasks.
+
+Tasks may include:
+
+Add/start/stop user session
+
+Update filters/rules
+
+Restart failed session
+
+Return RAM usage
+
+Use task acknowledgment to confirm success/failure.
+
+Worker Crash Handling
+
+Main server must detect when a worker:
+
+Is unresponsive for >15s
+
+Sends corrupted data
+
+Exceeds memory limits
+
+Auto-assign affected user sessions to available workers or notify admin if none available.
+
+Admin Tools & Monitoring
+
+Admin dashboard should show:
+
+List of workers with RAM/session usage
+
+Assigned users and status (Active/Idle/Failed)
+
+Start/Stop worker manually
+
+Reassign sessions manually
+
+Add/remove worker server keys
+
+Real-time session RAM profiling per user
+
+Code Requirements
+
+Use environment variables or auth tokens for secure worker-server comms
+
+Modular, extendable worker manager module
+
+Logging with timestamps, worker IDs, and task context
+
+Deliverables:
+
+Fully functional worker manager on main server
+
+Independent, RAM-aware worker client that can run on multiple VPSs
+
+Automatic and manual worker assignment logic
+
+Admin dashboard updates showing session & worker health
+
+RAM cleanup & optimization system

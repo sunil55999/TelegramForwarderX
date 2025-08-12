@@ -33,13 +33,39 @@ export const telegramSessions = pgTable("telegram_sessions", {
 export const workers = pgTable("workers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
-  status: text("status").notNull().default("offline"), // "online" | "offline" | "crashed"
-  cpuUsage: integer("cpu_usage").notNull().default(0),
-  memoryUsage: integer("memory_usage").notNull().default(0),
+  workerId: text("worker_id").notNull().unique(), // Unique identifier for worker instance
+  serverAddress: text("server_address").notNull(), // Worker server IP/hostname
+  status: text("status").notNull().default("offline"), // "online" | "offline" | "crashed" | "maintenance"
+  
+  // System Resources
+  totalRam: integer("total_ram").notNull().default(0), // Total RAM in MB
+  usedRam: integer("used_ram").notNull().default(0), // Used RAM in MB
+  cpuUsage: integer("cpu_usage").notNull().default(0), // CPU usage percentage
+  
+  // Capacity Management
+  maxSessions: integer("max_sessions").notNull().default(20), // Maximum sessions allowed
   activeSessions: integer("active_sessions").notNull().default(0),
+  
+  // Performance Metrics
+  loadScore: integer("load_score").notNull().default(0), // Calculated load (0-100)
+  pingLatency: integer("ping_latency").notNull().default(0), // Response time in ms
   messagesPerHour: integer("messages_per_hour").notNull().default(0),
+  
+  // Worker Configuration
+  ramThreshold: integer("ram_threshold").notNull().default(1536), // RAM limit in MB (1.5GB default)
+  priority: integer("priority").notNull().default(1), // Worker priority (1=highest)
+  authToken: text("auth_token").notNull(), // Secure token for worker authentication
+  
+  // Connection & Health
   lastHeartbeat: timestamp("last_heartbeat"),
+  lastTaskAssigned: timestamp("last_task_assigned"),
+  connectionCount: integer("connection_count").notNull().default(0),
+  
+  // Metadata
+  workerVersion: text("worker_version"),
   config: jsonb("config").default({}),
+  metadata: jsonb("metadata").default({}),
+  
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
   updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
 });
@@ -949,4 +975,298 @@ export type ReauthWorkflowStatus = {
     completed: string[];
     remaining: string[];
   };
+};
+
+// Phase 6: Distributed Worker System Tables
+
+// Worker Tasks Management
+export const workerTasks = pgTable("worker_tasks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  workerId: varchar("worker_id").notNull().references(() => workers.id, { onDelete: "cascade" }),
+  taskType: text("task_type").notNull(), // "start_session" | "stop_session" | "update_filters" | "restart_session" | "health_check"
+  taskData: jsonb("task_data").notNull(), // Task-specific parameters
+  
+  // Task Status
+  status: text("status").notNull().default("pending"), // "pending" | "assigned" | "running" | "completed" | "failed"
+  priority: integer("priority").notNull().default(1), // Higher number = higher priority
+  
+  // Execution Details
+  assignedAt: timestamp("assigned_at"),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  result: jsonb("result"), // Task execution result
+  errorMessage: text("error_message"),
+  
+  // Retry Logic
+  retryCount: integer("retry_count").notNull().default(0),
+  maxRetries: integer("max_retries").notNull().default(3),
+  
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+
+// Session Assignment and Load Balancing
+export const sessionAssignments = pgTable("session_assignments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sessionId: varchar("session_id").notNull().references(() => telegramSessions.id, { onDelete: "cascade" }),
+  workerId: varchar("worker_id").notNull().references(() => workers.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  
+  // Assignment Details
+  assignmentType: text("assignment_type").notNull(), // "manual" | "automatic" | "failover"
+  priority: integer("priority").notNull().default(1), // Based on user subscription
+  
+  // Status and Health
+  status: text("status").notNull().default("assigned"), // "assigned" | "active" | "paused" | "failed" | "migrating"
+  lastHeartbeat: timestamp("last_heartbeat"),
+  
+  // Performance Tracking
+  messagesProcessed: integer("messages_processed").notNull().default(0),
+  ramUsageMb: integer("ram_usage_mb").notNull().default(0),
+  avgProcessingTime: integer("avg_processing_time").notNull().default(0), // Milliseconds
+  
+  // Assignment History
+  assignedAt: timestamp("assigned_at").notNull().default(sql`now()`),
+  activatedAt: timestamp("activated_at"),
+  lastMigration: timestamp("last_migration"),
+  
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+
+// Worker Session Queue for Overflow Management
+export const sessionQueue = pgTable("session_queue", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  sessionId: varchar("session_id").notNull().references(() => telegramSessions.id, { onDelete: "cascade" }),
+  
+  // Queue Management
+  priority: integer("priority").notNull().default(1), // Based on user subscription
+  queuePosition: integer("queue_position").notNull(),
+  estimatedWaitTime: integer("estimated_wait_time").notNull().default(0), // Minutes
+  
+  // Queue Status
+  status: text("status").notNull().default("queued"), // "queued" | "processing" | "assigned" | "expired"
+  queuedAt: timestamp("queued_at").notNull().default(sql`now()`),
+  processedAt: timestamp("processed_at"),
+  expiredAt: timestamp("expired_at"),
+  
+  // Notification
+  notificationSent: boolean("notification_sent").notNull().default(false),
+  
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+
+// Worker Performance Analytics
+export const workerAnalytics = pgTable("worker_analytics", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  workerId: varchar("worker_id").notNull().references(() => workers.id, { onDelete: "cascade" }),
+  
+  // Time Period
+  periodStart: timestamp("period_start").notNull(),
+  periodEnd: timestamp("period_end").notNull(),
+  
+  // Performance Metrics
+  totalSessions: integer("total_sessions").notNull().default(0),
+  totalMessages: integer("total_messages").notNull().default(0),
+  avgCpuUsage: integer("avg_cpu_usage").notNull().default(0),
+  avgRamUsage: integer("avg_ram_usage").notNull().default(0),
+  maxRamUsage: integer("max_ram_usage").notNull().default(0),
+  
+  // Reliability Metrics
+  uptime: integer("uptime").notNull().default(0), // Seconds
+  crashCount: integer("crash_count").notNull().default(0),
+  reconnectCount: integer("reconnect_count").notNull().default(0),
+  avgResponseTime: integer("avg_response_time").notNull().default(0), // Milliseconds
+  
+  // Load Distribution
+  premiumSessions: integer("premium_sessions").notNull().default(0),
+  freeSessions: integer("free_sessions").notNull().default(0),
+  
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+// System Scaling Events
+export const scalingEvents = pgTable("scaling_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventType: text("event_type").notNull(), // "scale_up" | "scale_down" | "worker_added" | "worker_removed" | "overflow_detected"
+  
+  // Event Details
+  trigger: text("trigger").notNull(), // "high_load" | "manual" | "worker_failure" | "low_resources"
+  description: text("description").notNull(),
+  
+  // Metrics at Event Time
+  totalWorkers: integer("total_workers").notNull(),
+  totalSessions: integer("total_sessions").notNull(),
+  queuedSessions: integer("queued_sessions").notNull(),
+  avgLoadScore: integer("avg_load_score").notNull(),
+  
+  // Action Taken
+  actionTaken: text("action_taken"),
+  actionResult: text("action_result"), // "success" | "failed" | "partial"
+  
+  // Notification
+  adminNotified: boolean("admin_notified").notNull().default(false),
+  
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+// Admin Worker Controls
+export const workerControls = pgTable("worker_controls", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  workerId: varchar("worker_id").notNull().references(() => workers.id, { onDelete: "cascade" }),
+  adminUserId: varchar("admin_user_id").notNull().references(() => users.id),
+  
+  // Control Action
+  action: text("action").notNull(), // "start" | "stop" | "restart" | "maintenance" | "priority_change" | "session_reassign"
+  actionData: jsonb("action_data"), // Action-specific parameters
+  
+  // Execution
+  status: text("status").notNull().default("pending"), // "pending" | "executing" | "completed" | "failed"
+  executedAt: timestamp("executed_at"),
+  result: jsonb("result"),
+  errorMessage: text("error_message"),
+  
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+// Phase 6 Insert Schemas
+export const insertWorkerTaskSchema = createInsertSchema(workerTasks).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertSessionAssignmentSchema = createInsertSchema(sessionAssignments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertSessionQueueSchema = createInsertSchema(sessionQueue).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertWorkerAnalyticsSchema = createInsertSchema(workerAnalytics).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertScalingEventSchema = createInsertSchema(scalingEvents).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertWorkerControlSchema = createInsertSchema(workerControls).omit({
+  id: true,
+  createdAt: true,
+});
+
+// Phase 6 Types
+export type InsertWorkerTask = z.infer<typeof insertWorkerTaskSchema>;
+export type WorkerTask = typeof workerTasks.$inferSelect;
+
+export type InsertSessionAssignment = z.infer<typeof insertSessionAssignmentSchema>;
+export type SessionAssignment = typeof sessionAssignments.$inferSelect;
+
+export type InsertSessionQueue = z.infer<typeof insertSessionQueueSchema>;
+export type SessionQueue = typeof sessionQueue.$inferSelect;
+
+export type InsertWorkerAnalytics = z.infer<typeof insertWorkerAnalyticsSchema>;
+export type WorkerAnalytics = typeof workerAnalytics.$inferSelect;
+
+export type InsertScalingEvent = z.infer<typeof insertScalingEventSchema>;
+export type ScalingEvent = typeof scalingEvents.$inferSelect;
+
+export type InsertWorkerControl = z.infer<typeof insertWorkerControlSchema>;
+export type WorkerControl = typeof workerControls.$inferSelect;
+
+// Phase 6 API Response types
+export type WorkerSystemStatus = {
+  totalWorkers: number;
+  onlineWorkers: number;
+  totalSessions: number;
+  queuedSessions: number;
+  avgLoadScore: number;
+  systemCapacity: {
+    totalRam: number;
+    usedRam: number;
+    utilizationPercent: number;
+  };
+  lastScalingEvent?: {
+    type: string;
+    trigger: string;
+    timestamp: string;
+  };
+};
+
+export type WorkerNodeInfo = {
+  id: string;
+  workerId: string;
+  name: string;
+  serverAddress: string;
+  status: string;
+  resources: {
+    totalRam: number;
+    usedRam: number;
+    ramPercent: number;
+    cpuUsage: number;
+  };
+  capacity: {
+    maxSessions: number;
+    activeSessions: number;
+    availableSlots: number;
+  };
+  performance: {
+    loadScore: number;
+    pingLatency: number;
+    messagesPerHour: number;
+    uptime: number;
+  };
+  lastHeartbeat?: string;
+};
+
+export type SessionAssignmentInfo = {
+  sessionId: string;
+  sessionName: string;
+  userId: string;
+  username: string;
+  workerId: string;
+  workerName: string;
+  assignmentType: string;
+  status: string;
+  priority: number;
+  performance: {
+    messagesProcessed: number;
+    ramUsageMb: number;
+    avgProcessingTime: number;
+  };
+  assignedAt: string;
+  lastActivity?: string;
+};
+
+export type QueuedSessionInfo = {
+  sessionId: string;
+  sessionName: string;
+  userId: string;
+  username: string;
+  userType: string; // For priority calculation
+  queuePosition: number;
+  estimatedWaitTime: number;
+  priority: number;
+  status: string;
+  queuedAt: string;
+};
+
+export type WorkerLoadBalanceResult = {
+  success: boolean;
+  assignedWorkerId?: string;
+  workerName?: string;
+  queuePosition?: number;
+  estimatedWaitTime?: number;
+  reason: string;
+  loadBalanceStrategy: "immediate" | "queued" | "overflow";
 };

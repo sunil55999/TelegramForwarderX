@@ -23,7 +23,14 @@ import {
   insertReauthRequestSchema,
   insertAccountForwardingMappingSchema,
   insertSessionBackupSchema,
-  insertSyncEventSchema
+  insertSyncEventSchema,
+  // Phase 6 schemas
+  insertWorkerTaskSchema,
+  insertSessionAssignmentSchema,
+  insertSessionQueueSchema,
+  insertWorkerAnalyticsSchema,
+  insertScalingEventSchema,
+  insertWorkerControlSchema
 } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -1437,6 +1444,363 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Process sync events error:", error);
       res.status(500).json({ message: "Failed to process sync events" });
+    }
+  });
+
+  // Phase 6: Distributed Worker System API Routes
+
+  // Worker System Status & Monitoring
+  app.get("/api/workers/system/status", async (req, res) => {
+    try {
+      const status = await storage.getWorkerSystemStatus();
+      res.json(status);
+    } catch (error) {
+      console.error("Get worker system status error:", error);
+      res.status(500).json({ message: "Failed to get worker system status" });
+    }
+  });
+
+  app.get("/api/workers/available", async (req, res) => {
+    try {
+      const workers = await storage.getAvailableWorkers();
+      res.json(workers);
+    } catch (error) {
+      console.error("Get available workers error:", error);
+      res.status(500).json({ message: "Failed to get available workers" });
+    }
+  });
+
+  app.get("/api/workers/:workerId/info", async (req, res) => {
+    try {
+      const { workerId } = req.params;
+      const workerInfo = await storage.getWorkerNodeInfo(workerId);
+      
+      if (!workerInfo) {
+        return res.status(404).json({ message: "Worker not found" });
+      }
+      
+      res.json(workerInfo);
+    } catch (error) {
+      console.error("Get worker node info error:", error);
+      res.status(500).json({ message: "Failed to get worker info" });
+    }
+  });
+
+  // Worker Task Management
+  app.post("/api/workers/tasks", async (req, res) => {
+    try {
+      const taskData = insertWorkerTaskSchema.parse(req.body);
+      const task = await storage.createWorkerTask(taskData);
+      res.status(201).json(task);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid task data", errors: error.errors });
+      }
+      console.error("Create worker task error:", error);
+      res.status(500).json({ message: "Failed to create worker task" });
+    }
+  });
+
+  app.get("/api/workers/:workerId/tasks", async (req, res) => {
+    try {
+      const { workerId } = req.params;
+      const tasks = await storage.getWorkerTasksByWorkerId(workerId);
+      res.json(tasks);
+    } catch (error) {
+      console.error("Get worker tasks error:", error);
+      res.status(500).json({ message: "Failed to get worker tasks" });
+    }
+  });
+
+  app.get("/api/workers/tasks/pending", async (req, res) => {
+    try {
+      const tasks = await storage.getPendingWorkerTasks();
+      res.json(tasks);
+    } catch (error) {
+      console.error("Get pending tasks error:", error);
+      res.status(500).json({ message: "Failed to get pending tasks" });
+    }
+  });
+
+  app.put("/api/workers/tasks/:taskId", async (req, res) => {
+    try {
+      const { taskId } = req.params;
+      const updates = req.body;
+      const task = await storage.updateWorkerTask(taskId, updates);
+      
+      if (!task) {
+        return res.status(404).json({ message: "Task not found" });
+      }
+      
+      res.json(task);
+    } catch (error) {
+      console.error("Update worker task error:", error);
+      res.status(500).json({ message: "Failed to update worker task" });
+    }
+  });
+
+  // Session Assignment & Load Balancing
+  app.post("/api/sessions/:sessionId/assign", async (req, res) => {
+    try {
+      const { sessionId } = req.params;
+      const { userId } = req.body;
+      
+      if (!userId) {
+        return res.status(400).json({ message: "userId is required" });
+      }
+
+      const result = await storage.assignSessionToWorker(sessionId, userId);
+      
+      if (result.success) {
+        res.json(result);
+      } else {
+        res.status(409).json(result); // Conflict status for queued sessions
+      }
+    } catch (error) {
+      console.error("Assign session to worker error:", error);
+      res.status(500).json({ message: "Failed to assign session to worker" });
+    }
+  });
+
+  app.post("/api/sessions/:sessionId/reassign", async (req, res) => {
+    try {
+      const { sessionId } = req.params;
+      const { newWorkerId } = req.body;
+      
+      if (!newWorkerId) {
+        return res.status(400).json({ message: "newWorkerId is required" });
+      }
+
+      const success = await storage.reassignSession(sessionId, newWorkerId);
+      
+      if (!success) {
+        return res.status(400).json({ message: "Failed to reassign session - check worker capacity" });
+      }
+      
+      res.json({ success: true, message: "Session reassigned successfully" });
+    } catch (error) {
+      console.error("Reassign session error:", error);
+      res.status(500).json({ message: "Failed to reassign session" });
+    }
+  });
+
+  app.get("/api/sessions/:sessionId/assignment", async (req, res) => {
+    try {
+      const { sessionId } = req.params;
+      const assignment = await storage.getSessionAssignmentInfo(sessionId);
+      
+      if (!assignment) {
+        return res.status(404).json({ message: "Session assignment not found" });
+      }
+      
+      res.json(assignment);
+    } catch (error) {
+      console.error("Get session assignment info error:", error);
+      res.status(500).json({ message: "Failed to get session assignment info" });
+    }
+  });
+
+  app.get("/api/workers/:workerId/assignments", async (req, res) => {
+    try {
+      const { workerId } = req.params;
+      const assignments = await storage.getSessionAssignmentsByWorkerId(workerId);
+      res.json(assignments);
+    } catch (error) {
+      console.error("Get worker assignments error:", error);
+      res.status(500).json({ message: "Failed to get worker assignments" });
+    }
+  });
+
+  // Session Queue Management
+  app.get("/api/sessions/queue", async (req, res) => {
+    try {
+      const queuedSessions = await storage.getQueuedSessionsInfo();
+      res.json(queuedSessions);
+    } catch (error) {
+      console.error("Get queued sessions error:", error);
+      res.status(500).json({ message: "Failed to get queued sessions" });
+    }
+  });
+
+  app.post("/api/sessions/queue/process", async (req, res) => {
+    try {
+      const processedQueue = await storage.processSessionQueue();
+      res.json(processedQueue);
+    } catch (error) {
+      console.error("Process session queue error:", error);
+      res.status(500).json({ message: "Failed to process session queue" });
+    }
+  });
+
+  app.delete("/api/sessions/queue/:queueId", async (req, res) => {
+    try {
+      const { queueId } = req.params;
+      const deleted = await storage.deleteSessionQueue(queueId);
+      
+      if (!deleted) {
+        return res.status(404).json({ message: "Queue item not found" });
+      }
+      
+      res.json({ message: "Queue item removed successfully" });
+    } catch (error) {
+      console.error("Delete queue item error:", error);
+      res.status(500).json({ message: "Failed to delete queue item" });
+    }
+  });
+
+  // Worker Analytics
+  app.post("/api/workers/:workerId/analytics", async (req, res) => {
+    try {
+      const { workerId } = req.params;
+      const analyticsData = insertWorkerAnalyticsSchema.parse({
+        ...req.body,
+        workerId
+      });
+      const analytics = await storage.createWorkerAnalytics(analyticsData);
+      res.status(201).json(analytics);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid analytics data", errors: error.errors });
+      }
+      console.error("Create worker analytics error:", error);
+      res.status(500).json({ message: "Failed to create worker analytics" });
+    }
+  });
+
+  app.get("/api/workers/:workerId/analytics", async (req, res) => {
+    try {
+      const { workerId } = req.params;
+      const { startDate, endDate } = req.query;
+      
+      if (!startDate || !endDate) {
+        return res.status(400).json({ message: "startDate and endDate are required" });
+      }
+
+      const analytics = await storage.getWorkerAnalytics(
+        workerId, 
+        new Date(startDate as string), 
+        new Date(endDate as string)
+      );
+      res.json(analytics);
+    } catch (error) {
+      console.error("Get worker analytics error:", error);
+      res.status(500).json({ message: "Failed to get worker analytics" });
+    }
+  });
+
+  // Scaling Events
+  app.get("/api/system/scaling-events", async (req, res) => {
+    try {
+      const { limit } = req.query;
+      const events = await storage.getScalingEvents(limit ? parseInt(limit as string) : 50);
+      res.json(events);
+    } catch (error) {
+      console.error("Get scaling events error:", error);
+      res.status(500).json({ message: "Failed to get scaling events" });
+    }
+  });
+
+  app.post("/api/system/scaling-events", async (req, res) => {
+    try {
+      const eventData = insertScalingEventSchema.parse(req.body);
+      const event = await storage.createScalingEvent(eventData);
+      res.status(201).json(event);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid scaling event data", errors: error.errors });
+      }
+      console.error("Create scaling event error:", error);
+      res.status(500).json({ message: "Failed to create scaling event" });
+    }
+  });
+
+  app.post("/api/system/scaling/check", async (req, res) => {
+    try {
+      await storage.triggerScalingCheck();
+      res.json({ message: "Scaling check triggered successfully" });
+    } catch (error) {
+      console.error("Trigger scaling check error:", error);
+      res.status(500).json({ message: "Failed to trigger scaling check" });
+    }
+  });
+
+  // Worker Controls
+  app.post("/api/workers/:workerId/controls", async (req, res) => {
+    try {
+      const { workerId } = req.params;
+      const controlData = insertWorkerControlSchema.parse({
+        ...req.body,
+        workerId
+      });
+      const control = await storage.createWorkerControl(controlData);
+      res.status(201).json(control);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid control data", errors: error.errors });
+      }
+      console.error("Create worker control error:", error);
+      res.status(500).json({ message: "Failed to create worker control" });
+    }
+  });
+
+  app.get("/api/workers/:workerId/controls", async (req, res) => {
+    try {
+      const { workerId } = req.params;
+      const controls = await storage.getWorkerControlsByWorkerId(workerId);
+      res.json(controls);
+    } catch (error) {
+      console.error("Get worker controls error:", error);
+      res.status(500).json({ message: "Failed to get worker controls" });
+    }
+  });
+
+  app.get("/api/workers/controls/pending", async (req, res) => {
+    try {
+      const controls = await storage.getPendingWorkerControls();
+      res.json(controls);
+    } catch (error) {
+      console.error("Get pending controls error:", error);
+      res.status(500).json({ message: "Failed to get pending controls" });
+    }
+  });
+
+  app.put("/api/workers/controls/:controlId", async (req, res) => {
+    try {
+      const { controlId } = req.params;
+      const updates = req.body;
+      const control = await storage.updateWorkerControl(controlId, updates);
+      
+      if (!control) {
+        return res.status(404).json({ message: "Control not found" });
+      }
+      
+      res.json(control);
+    } catch (error) {
+      console.error("Update worker control error:", error);
+      res.status(500).json({ message: "Failed to update worker control" });
+    }
+  });
+
+  // Worker Load Calculation
+  app.get("/api/workers/:workerId/load-score", async (req, res) => {
+    try {
+      const { workerId } = req.params;
+      const loadScore = await storage.calculateWorkerLoadScore(workerId);
+      res.json({ workerId, loadScore });
+    } catch (error) {
+      console.error("Calculate worker load score error:", error);
+      res.status(500).json({ message: "Failed to calculate worker load score" });
+    }
+  });
+
+  app.get("/api/workers/:workerId/capacity", async (req, res) => {
+    try {
+      const { workerId } = req.params;
+      const hasCapacity = await storage.checkWorkerCapacity(workerId);
+      res.json({ workerId, hasCapacity });
+    } catch (error) {
+      console.error("Check worker capacity error:", error);
+      res.status(500).json({ message: "Failed to check worker capacity" });
     }
   });
 
