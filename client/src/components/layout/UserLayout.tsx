@@ -44,20 +44,7 @@ export default function UserLayout({ children }: UserLayoutProps) {
       current: location === "/dashboard",
       color: "purple",
     },
-    {
-      name: "Sources",
-      href: "/sources", 
-      icon: MessageSquare,
-      current: location === "/sources",
-      color: "cyan",
-    },
-    {
-      name: "Destinations",
-      href: "/destinations",
-      icon: Router,
-      current: location === "/destinations",
-      color: "green",
-    },
+
     {
       name: "Forwarding Rules",
       href: "/forwarding",

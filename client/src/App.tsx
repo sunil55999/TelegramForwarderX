@@ -22,8 +22,6 @@ import Statistics from "@/pages/Statistics";
 
 // User Dashboard Pages
 import Dashboard from "@/pages/dashboard";
-import SourcesPage from "@/pages/SourcesPage";
-import DestinationsPage from "@/pages/DestinationsPage";
 import ForwardingPage from "@/pages/ForwardingPage";
 import RegexRules from "@/pages/RegexRules";
 import PendingMessages from "@/pages/PendingMessages";
@@ -110,21 +108,7 @@ function Router() {
         </ProtectedRoute>
       </Route>
       
-      <Route path="/sources">
-        <ProtectedRoute>
-          <UserLayout>
-            <SourcesPage />
-          </UserLayout>
-        </ProtectedRoute>
-      </Route>
-      
-      <Route path="/destinations">
-        <ProtectedRoute>
-          <UserLayout>
-            <DestinationsPage />
-          </UserLayout>
-        </ProtectedRoute>
-      </Route>
+
       
       <Route path="/forwarding">
         <ProtectedRoute>

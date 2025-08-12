@@ -422,8 +422,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/forwarding/mappings", async (req, res) => {
     try {
-      const mappingData = insertForwardingMappingSchema.parse(req.body);
-      const mapping = await storage.createForwardingMapping(mappingData);
+      const requestData = req.body;
+      let sourceId = requestData.sourceId;
+      let destinationId = requestData.destinationId;
+
+      // Create new source if provided
+      if (requestData.newSource && (!sourceId || sourceId === "add-new")) {
+        try {
+          const sourceData = insertSourceSchema.parse(requestData.newSource);
+          const newSource = await storage.createSource(sourceData);
+          sourceId = newSource.id;
+        } catch (sourceError) {
+          if (sourceError instanceof z.ZodError) {
+            return res.status(400).json({ 
+              message: "Invalid source data", 
+              errors: sourceError.errors,
+              field: "newSource"
+            });
+          }
+          throw sourceError;
+        }
+      }
+
+      // Create new destination if provided
+      if (requestData.newDestination && (!destinationId || destinationId === "add-new")) {
+        try {
+          const destinationData = insertDestinationSchema.parse(requestData.newDestination);
+          const newDestination = await storage.createDestination(destinationData);
+          destinationId = newDestination.id;
+        } catch (destinationError) {
+          if (destinationError instanceof z.ZodError) {
+            return res.status(400).json({ 
+              message: "Invalid destination data", 
+              errors: destinationError.errors,
+              field: "newDestination"
+            });
+          }
+          throw destinationError;
+        }
+      }
+
+      // Validate that we have both source and destination IDs
+      if (!sourceId || !destinationId) {
+        return res.status(400).json({ 
+          message: "Valid source and destination are required" 
+        });
+      }
+
+      // Create the mapping with the resolved IDs
+      const mappingData = {
+        sourceId,
+        destinationId,
+        priority: requestData.priority || 1,
+        isActive: requestData.isActive !== false, // default to true
+        filters: {
+          includeKeywords: requestData.includeKeywords || [],
+          excludeKeywords: requestData.excludeKeywords || [],
+          keywordMatchMode: requestData.keywordMatchMode || "any",
+          caseSensitive: requestData.caseSensitive || false,
+          allowedMessageTypes: requestData.allowedMessageTypes || [],
+          blockUrls: requestData.blockUrls || false,
+          blockForwards: requestData.blockForwards || false,
+          minMessageLength: requestData.minMessageLength || 0,
+          maxMessageLength: requestData.maxMessageLength || 4096,
+        },
+        editing: {
+          headerText: requestData.headerText || null,
+          footerText: requestData.footerText || null,
+          removeSenderInfo: requestData.removeSenderInfo || false,
+          removeUrls: requestData.removeUrls || false,
+          removeHashtags: requestData.removeHashtags || false,
+          removeMentions: requestData.removeMentions || false,
+          preserveFormatting: requestData.preserveFormatting !== false, // default to true
+        }
+      };
+
+      const validatedMappingData = insertForwardingMappingSchema.parse(mappingData);
+      const mapping = await storage.createForwardingMapping(validatedMappingData);
+      
       res.status(201).json(mapping);
     } catch (error) {
       if (error instanceof z.ZodError) {
