@@ -2,6 +2,92 @@
 @tailwind components;
 @tailwind utilities;
 
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 5px currentColor;
+  }
+  50% {
+    box-shadow: 0 0 20px currentColor, 0 0 30px currentColor;
+  }
+}
+
+@keyframes ninja-slide {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.6s ease-out forwards;
+}
+
+.animate-glow-pulse {
+  animation: glow-pulse 2s ease-in-out infinite;
+}
+
+.animate-ninja-slide {
+  animation: ninja-slide 0.5s ease-out forwards;
+}
+
+/* Custom scrollbar for webkit browsers */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgb(31 41 55 / 0.3);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgb(139 92 246 / 0.5);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(139 92 246 / 0.7);
+}
+
+/* Glass morphism effect */
+.backdrop-blur-sm {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* Neon glow effects */
+.neon-purple {
+  box-shadow: 0 0 5px #a855f7, 0 0 10px #a855f7, 0 0 15px #a855f7;
+}
+
+.neon-cyan {
+  box-shadow: 0 0 5px #06b6d4, 0 0 10px #06b6d4, 0 0 15px #06b6d4;
+}
+
+.neon-green {
+  box-shadow: 0 0 5px #10b981, 0 0 10px #10b981, 0 0 15px #10b981;
+}
+
+/* Dark theme overrides */
+.dark {
+  color-scheme: dark;
+}
+
 :root {
   --background: hsl(0 0% 100%);
   --foreground: hsl(210 25% 7.8431%);

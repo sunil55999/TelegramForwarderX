@@ -1,3 +1,5 @@
+import { useState, useEffect } from "react";
+
 export interface User {
   id: string;
   username: string;
@@ -208,4 +210,32 @@ export const isRouteAccessible = (path: string, user?: User | null): boolean => 
   }
   
   return false;
+};
+
+// React hook for using auth state
+export const useAuth = () => {
+  const [authState, setAuthState] = useState<AuthState>(getAuthState);
+
+  useEffect(() => {
+    // Listen for storage changes to sync auth state across tabs
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "authToken" || e.key === "user") {
+        setAuthState(getAuthState());
+      }
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    
+    // Also refresh auth state periodically to check for token expiry
+    const interval = setInterval(() => {
+      setAuthState(getAuthState());
+    }, 60000); // Check every minute
+
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      clearInterval(interval);
+    };
+  }, []);
+
+  return authState;
 };

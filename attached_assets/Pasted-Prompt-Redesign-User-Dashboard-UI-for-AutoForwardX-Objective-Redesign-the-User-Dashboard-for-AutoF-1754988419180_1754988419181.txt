@@ -1,0 +1,120 @@
+Prompt: Redesign User Dashboard UI for AutoForwardX
+Objective:
+Redesign the User Dashboard for AutoForwardX to create a beginner-friendly, mobile-responsive, dark-themed interface with a touch of anime/ninja aesthetics. The dashboard should be visually engaging, easy to navigate, and optimized for users to quickly access and manage their Telegram forwarding system.
+
+Key Requirements:
+Color Scheme & Theme
+
+Dark Theme: Use dark gray backgrounds with bright neon highlights (e.g., neon blue, purple, teal).
+
+Anime/Ninja-Inspired Elements: Incorporate sleek, glowing accents, minimalistic icons, and subtle animations for a smooth and dynamic user experience.
+
+Typography: Use a clean, modern font (e.g., Poppins, Roboto) with bold headings and bright, readable text.
+
+Main Navigation Sidebar
+
+The sidebar should include key sections like Dashboard, Sources, Destinations, Forwarding Rules, Logs, and Settings.
+
+The sidebar should be collapsible on mobile screens.
+
+Use icon-based navigation with smooth hover animations (e.g., glowing icons, ninja star effects).
+
+Active navigation items should have a glowing outline or background.
+
+Dashboard Header
+
+Welcome message at the top, with the user’s name and a greeting (e.g., “Welcome back, [Username]!").
+
+System health section: Show RAM usage, CPU usage, and Database load with neon progress bars.
+
+Active Sessions & Workers: Display key statistics in cards with neon-colored numbers.
+
+Recent Activity Feed
+
+Display recent system activities (e.g., new users, active sessions).
+
+Use neon-tinted notification cards with smooth animation for new updates.
+
+Color-code activities: Green for success, Red for errors, Blue for information.
+
+Footer & Session Controls
+
+Provide session management options at the bottom: Pause/Stop Session, Add New Session, etc.
+
+Buttons should have rounded corners, glowing hover effects, and an anime-inspired background on click.
+
+Mobile Responsiveness
+
+Ensure the layout is fully responsive: collapsible sidebar, stacked content sections.
+
+On mobile, side navigation becomes a sliding panel or collapsible dropdown.
+
+Ensure buttons and cards adjust their size and layout on smaller screens.
+
+Interactive Elements & Animations
+
+Smooth transitions for page loads, hover effects, and clickable buttons.
+
+Subtle animations on session statistics (e.g., values can pulse or glow on update).
+
+Use CSS animations for button hover effects and transitions.
+
+Add a loading spinner or progress bar when data is fetching.
+
+Statistics & Performance Monitoring
+
+Display live data such as the number of active sessions, forwarding tasks, and messages processed today in an interactive dashboard.
+
+Use animated graphs or neon bars for visual performance stats.
+
+User-Friendly Interface
+
+Tooltips: Hover over icons or buttons to show tooltips describing their function (helpful for beginners).
+
+Clear Sectioning: Group related settings and data together for better usability (e.g., Session Management under one section).
+
+Feedback & Notifications: Display success/error pop-ups with glow effects when users complete tasks or make changes.
+
+Accessibility Considerations
+
+Ensure contrast ratios are high enough for accessibility.
+
+Implement keyboard navigation and screen reader compatibility.
+
+Make sure icons and text are sufficiently large for easier reading.
+
+Expected Deliverables:
+Complete Redesign of the User Dashboard UI:
+
+Mobile-first, dark-themed design with neon accents.
+
+Collapsible sidebar with intuitive, icon-based navigation.
+
+User stats and activity feed with smooth animations.
+
+Working UI/UX Components:
+
+Hover animations for icons and buttons.
+
+Card-based statistics with real-time data updates.
+
+Neon glow effects on session information, buttons, and icons.
+
+Responsive Layout:
+
+Sidebar collapses or becomes a floating panel on mobile.
+
+Layout adapts based on screen size.
+
+Improved User Experience:
+
+Beginner-friendly tooltips, onboarding, and clear, minimal design elements.
+
+Error feedback and notifications with animated transitions.
+
+Additional Notes:
+This UI redesign should maintain functional clarity and ease of use while introducing the desired anime/ninja aesthetic.
+
+Prioritize performance and ensure the page loads quickly, even with the visual enhancements.
+
+Focus on clean, modern design, ensuring the layout is easy to understand even for new users.
