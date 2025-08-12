@@ -26,6 +26,8 @@ import SubscriptionDashboard from "@/pages/SubscriptionDashboard";
 import MultiAccountManagement from "@/pages/MultiAccountManagement";
 import TeamCollaboration from "@/pages/TeamCollaboration";
 import SessionResilience from "@/pages/SessionResilience";
+// Phase 6 pages
+import Phase6Verification from "@/pages/Phase6Verification";
 
 function Router() {
   return (
@@ -51,6 +53,7 @@ function Router() {
       <Route path="/multi-accounts" component={MultiAccountManagement} />
       <Route path="/team-collaboration" component={TeamCollaboration} />
       <Route path="/session-resilience" component={SessionResilience} />
+      <Route path="/phase6-verification" component={Phase6Verification} />
       <Route component={NotFound} />
     </Switch>
   );

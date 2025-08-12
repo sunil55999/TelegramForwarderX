@@ -1,0 +1,139 @@
+🧪 Phase 6 Verification Prompt — AutoForwardX Worker Scaling & RAM Optimization
+
+Goal: Verify that Phase 6 functionality — including dynamic worker management, RAM-aware session distribution, crash handling, and premium prioritization — has been fully implemented and is stable under real-world usage.
+
+Run the following checks to confirm feature completeness, performance, and stability:
+
+✅ 1. Worker Registration & Monitoring
+
+Start 2–3 worker nodes.
+
+Confirm:
+
+Workers register correctly with the main server.
+
+Main server dashboard displays: worker ID, RAM usage, number of sessions, status (Active/Idle).
+
+Workers send regular heartbeat every 10–15 seconds.
+
+Kill one worker process. Verify:
+
+Main server detects disconnection within 15 seconds.
+
+Status on dashboard changes to Offline or Unavailable.
+
+✅ 2. Session Assignment Based on RAM
+
+Start 2 workers with different RAM loads.
+
+Add multiple sessions (mix of free and premium users).
+
+Verify:
+
+Premium users are assigned to least-loaded worker first.
+
+Free users are queued or assigned to less optimal workers only when premium placement is full.
+
+RAM usage is respected per worker (e.g., max 1.5 GB or 20 sessions).
+
+No worker exceeds the RAM/session limits.
+
+✅ 3. Worker Overflow & Fallback Handling
+
+Force all workers to be near max capacity.
+
+Add a new premium session.
+
+Confirm:
+
+System automatically attempts overflow assignment (e.g., queue session or suggest new worker deployment).
+
+System logs warning or alert when no available workers.
+
+No session crashes or unhandled exceptions are thrown.
+
+✅ 4. RAM Efficiency: Idle Session Management
+
+After 10–15 minutes of inactivity:
+
+Sessions should remain connected in idle state (not shutdown or restarted).
+
+RAM usage per session should remain within 50–150 MB (test with psutil or logging).
+
+Confirm that:
+
+Inactive sessions do not poll or consume excess resources.
+
+Admin dashboard shows sessions as Idle vs Active.
+
+✅ 5. RAM Cleanup & Session Recycling
+
+Simulate multiple users stopping and restarting forwarding.
+
+Check:
+
+Memory is released properly when sessions are stopped.
+
+Restarting a session reuses the client instead of duplicating it.
+
+No zombie processes or duplicated Telethon clients remain.
+
+✅ 6. Task Execution Between Server & Worker
+
+From main server:
+
+Send task to worker (e.g., “stop session”, “reload rules”, “get RAM usage”).
+
+Confirm:
+
+Worker receives and executes task.
+
+Worker sends ACK/response.
+
+Main server updates task log/status accordingly.
+
+✅ 7. Admin Dashboard Verification
+
+Login as admin.
+
+Confirm:
+
+Worker list is displayed with real-time RAM, CPU, and session count.
+
+Manual controls: start/stop worker, reassign sessions, view session logs.
+
+Ability to assign specific users to specific workers.
+
+Premium/Free user tag visible per session.
+
+✅ 8. Crash Recovery & Reassignment
+
+Simulate crash (kill -9) on a worker running active sessions.
+
+Confirm:
+
+System marks sessions as Failed.
+
+Reassignment is attempted to another live worker (if available).
+
+Log includes details of reassignment or fallback status.
+
+✅ 9. Security & Communication Integrity
+
+Verify:
+
+Worker–server communication uses secure token or key auth.
+
+Unregistered worker cannot assign/receive tasks.
+
+All logs are timestamped and traceable.
+
+📋 Expected Output Format:
+
+Create a table like below to document each verification step:
+
+Test #	Feature Tested	Result (Pass/Fail)	Notes / Logs / Screenshot Reference
+1	Worker registration	Pass	Worker-01, Worker-02 shown on dash
+2	Session load distribution	Pass	Premium users assigned to Worker-01
+3	Overflow handling	Pass	Session queued, log triggered
+...	...	...
