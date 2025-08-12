@@ -22,15 +22,12 @@ import { apiRequest } from "@/lib/queryClient";
 const createMappingSchema = z.object({
   pairName: z.string().min(1, "Pair name is required"),
   pairType: z.enum(["channel-to-channel", "channel-to-group", "group-to-channel", "group-to-group"]).default("channel-to-channel"),
-  priority: z.number().min(1).max(10).default(1),
   // Source details
   sourceTitle: z.string().min(1, "Source title is required"),
   sourceType: z.enum(["channel", "group"]).default("channel"),
-  sourcePhone: z.string().optional(),
   // Destination details
   destinationTitle: z.string().min(1, "Destination title is required"),
   destinationType: z.enum(["channel", "group"]).default("channel"),
-  destinationPhone: z.string().optional(),
   // Advanced filters
   includeKeywords: z.string().optional(),
   excludeKeywords: z.string().optional(),
@@ -111,13 +108,10 @@ export default function ForwardingPage() {
     defaultValues: {
       pairName: "",
       pairType: "channel-to-channel",
-      priority: 1,
       sourceTitle: "",
       sourceType: "channel",
-      sourcePhone: "",
       destinationTitle: "",
       destinationType: "channel", 
-      destinationPhone: "",
       includeKeywords: "",
       excludeKeywords: "",
       keywordMatchMode: "any",
@@ -146,12 +140,12 @@ export default function ForwardingPage() {
       const apiData = {
         pairName: data.pairName,
         pairType: data.pairType,
-        priority: data.priority,
+        priority: 5, // Set default priority in backend
         // Create new source/destination with the provided details
         newSource: {
           chatTitle: data.sourceTitle,
           chatType: data.sourceType,
-          phoneNumber: data.sourcePhone || "+1234567890",
+          phoneNumber: "+1234567890", // Auto-fill logic or backend default
           apiId: "123456",
           apiHash: "abcdef123456",
           isActive: true,
@@ -159,7 +153,7 @@ export default function ForwardingPage() {
         newDestination: {
           chatTitle: data.destinationTitle,
           chatType: data.destinationType,
-          phoneNumber: data.destinationPhone || "+1234567890",
+          phoneNumber: "+1234567890", // Auto-fill logic or backend default
           apiId: "123456",
           apiHash: "abcdef123456", 
           isActive: true,
@@ -237,15 +231,15 @@ export default function ForwardingPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="space-y-6 p-4 md:p-6">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-[#E0E0E0]">Forwarding Mappings</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-[#E0E0E0]">Forwarding Mappings</h1>
           <p className="text-gray-400 mt-1">Manage your message forwarding rules</p>
         </div>
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-[#00B4D8] hover:bg-[#00B4D8]/80 text-white rounded-lg">
+            <Button className="bg-[#00B4D8] hover:bg-[#00B4D8]/80 text-white rounded-lg px-6 py-2 font-medium w-full sm:w-auto">
               <Plus className="w-4 h-4 mr-2" />
               Create Mapping
             </Button>
@@ -266,7 +260,7 @@ export default function ForwardingPage() {
                     <h3 className="text-lg font-semibold text-[#E0E0E0]">Pair Details</h3>
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
                       name="pairName"
@@ -308,30 +302,6 @@ export default function ForwardingPage() {
                         </FormItem>
                       )}
                     />
-                    
-                    <FormField
-                      control={form.control}
-                      name="priority"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-[#E0E0E0]">Priority (1-10)</FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="number" 
-                              min="1" 
-                              max="10" 
-                              {...field}
-                              onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
-                              className="bg-[#1E1E1E] border-[#333333] text-[#E0E0E0] focus:border-[#00B4D8] rounded-lg"
-                            />
-                          </FormControl>
-                          <FormDescription className="text-gray-500 text-sm">
-                            Higher numbers = higher priority
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
                   </div>
                 </div>
 
@@ -369,47 +339,27 @@ export default function ForwardingPage() {
                           )}
                         />
                         
-                        <div className="grid grid-cols-2 gap-3">
-                          <FormField
-                            control={form.control}
-                            name="sourceType"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="text-[#E0E0E0]">Type *</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                  <FormControl>
-                                    <SelectTrigger className="bg-[#232323] border-[#333333] text-[#E0E0E0] focus:border-[#00B4D8] rounded-lg">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent className="bg-[#1E1E1E] border-[#333333]">
-                                    <SelectItem value="channel">Channel</SelectItem>
-                                    <SelectItem value="group">Group</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          
-                          <FormField
-                            control={form.control}
-                            name="sourcePhone"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="text-[#E0E0E0]">Phone</FormLabel>
+                        <FormField
+                          control={form.control}
+                          name="sourceType"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-[#E0E0E0]">Type *</FormLabel>
+                              <Select onValueChange={field.onChange} defaultValue={field.value}>
                                 <FormControl>
-                                  <Input 
-                                    placeholder="+1234567890" 
-                                    {...field} 
-                                    className="bg-[#232323] border-[#333333] text-[#E0E0E0] focus:border-[#00B4D8] rounded-lg"
-                                  />
+                                  <SelectTrigger className="bg-[#232323] border-[#333333] text-[#E0E0E0] focus:border-[#00B4D8] rounded-lg">
+                                    <SelectValue />
+                                  </SelectTrigger>
                                 </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
+                                <SelectContent className="bg-[#1E1E1E] border-[#333333]">
+                                  <SelectItem value="channel">Channel</SelectItem>
+                                  <SelectItem value="group">Group</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
                       </CardContent>
                     </Card>
 
@@ -438,47 +388,27 @@ export default function ForwardingPage() {
                           )}
                         />
                         
-                        <div className="grid grid-cols-2 gap-3">
-                          <FormField
-                            control={form.control}
-                            name="destinationType"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="text-[#E0E0E0]">Type *</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                  <FormControl>
-                                    <SelectTrigger className="bg-[#232323] border-[#333333] text-[#E0E0E0] focus:border-[#00B4D8] rounded-lg">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent className="bg-[#1E1E1E] border-[#333333]">
-                                    <SelectItem value="channel">Channel</SelectItem>
-                                    <SelectItem value="group">Group</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          
-                          <FormField
-                            control={form.control}
-                            name="destinationPhone"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="text-[#E0E0E0]">Phone</FormLabel>
+                        <FormField
+                          control={form.control}
+                          name="destinationType"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-[#E0E0E0]">Type *</FormLabel>
+                              <Select onValueChange={field.onChange} defaultValue={field.value}>
                                 <FormControl>
-                                  <Input 
-                                    placeholder="+1234567890" 
-                                    {...field} 
-                                    className="bg-[#232323] border-[#333333] text-[#E0E0E0] focus:border-[#00B4D8] rounded-lg"
-                                  />
+                                  <SelectTrigger className="bg-[#232323] border-[#333333] text-[#E0E0E0] focus:border-[#00B4D8] rounded-lg">
+                                    <SelectValue />
+                                  </SelectTrigger>
                                 </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
+                                <SelectContent className="bg-[#1E1E1E] border-[#333333]">
+                                  <SelectItem value="channel">Channel</SelectItem>
+                                  <SelectItem value="group">Group</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
                       </CardContent>
                     </Card>
                   </div>
@@ -494,7 +424,7 @@ export default function ForwardingPage() {
                       type="button"
                       variant="ghost"
                       onClick={() => setShowAdvanced(!showAdvanced)}
-                      className="text-[#00B4D8] hover:bg-[#00B4D8]/10 rounded-lg transition-colors duration-200"
+                      className="text-[#00B4D8] hover:bg-[#00B4D8]/10 rounded-lg"
                     >
                       {showAdvanced ? (
                         <>
@@ -511,18 +441,18 @@ export default function ForwardingPage() {
                   </div>
                   
                   {showAdvanced && (
-                    <div className="transition-all duration-300 ease-in-out">
+                    <div>
                       <Tabs defaultValue="filters" className="w-full">
                         <TabsList className="grid w-full grid-cols-2 bg-[#1E1E1E] rounded-lg">
                           <TabsTrigger 
                             value="filters" 
-                            className="data-[state=active]:bg-[#00B4D8] data-[state=active]:text-white rounded-lg transition-colors duration-200"
+                            className="data-[state=active]:bg-[#00B4D8] data-[state=active]:text-white rounded-lg"
                           >
                             Filters
                           </TabsTrigger>
                           <TabsTrigger 
                             value="editing" 
-                            className="data-[state=active]:bg-[#00B4D8] data-[state=active]:text-white rounded-lg transition-colors duration-200"
+                            className="data-[state=active]:bg-[#00B4D8] data-[state=active]:text-white rounded-lg"
                           >
                             Editing
                           </TabsTrigger>
@@ -816,21 +746,19 @@ export default function ForwardingPage() {
         {mappings.map((mapping) => (
           <Card key={mapping.id} className="bg-[#1A1A1A] border-[#333333] rounded-lg">
             <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <div>
-                    <CardTitle className="text-lg flex items-center text-[#E0E0E0]">
-                      {mapping.sourceName}
-                      <ArrowRight className="w-4 h-4 mx-2 text-[#00B4D8]" />
-                      {mapping.destinationName}
-                    </CardTitle>
-                    <CardDescription className="text-gray-400">
-                      Priority: {mapping.priority} • 
-                      Created: {new Date(mapping.createdAt).toLocaleDateString()}
-                    </CardDescription>
-                  </div>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <CardTitle className="text-lg flex items-center text-[#E0E0E0] break-all">
+                    <span className="truncate">{mapping.sourceName}</span>
+                    <ArrowRight className="w-4 h-4 mx-2 text-[#00B4D8] flex-shrink-0" />
+                    <span className="truncate">{mapping.destinationName}</span>
+                  </CardTitle>
+                  <CardDescription className="text-gray-400 mt-1">
+                    Priority: {mapping.priority} • 
+                    Created: {new Date(mapping.createdAt).toLocaleDateString()}
+                  </CardDescription>
                 </div>
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center gap-2 flex-shrink-0">
                   <Badge variant={mapping.isActive ? "default" : "secondary"} className={
                     mapping.isActive 
                       ? "bg-[#00B4D8] text-white" 
@@ -843,7 +771,8 @@ export default function ForwardingPage() {
                     variant="ghost"
                     onClick={() => handleToggle(mapping.id)}
                     disabled={toggleMappingMutation.isPending}
-                    className="text-[#E0E0E0] hover:bg-[#333333] rounded-lg"
+                    className="text-[#E0E0E0] hover:bg-[#333333] rounded-lg p-2"
+                    title={mapping.isActive ? "Deactivate" : "Activate"}
                   >
                     {mapping.isActive ? (
                       <PowerOff className="w-4 h-4" />
@@ -856,7 +785,8 @@ export default function ForwardingPage() {
                     variant="ghost"
                     onClick={() => handleDelete(mapping.id, mapping.sourceName, mapping.destinationName)}
                     disabled={deleteMappingMutation.isPending}
-                    className="text-red-400 hover:bg-red-500/10 rounded-lg"
+                    className="text-red-400 hover:bg-red-500/10 rounded-lg p-2"
+                    title="Delete"
                   >
                     <Trash2 className="w-4 h-4" />
                   </Button>
@@ -864,13 +794,13 @@ export default function ForwardingPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <h4 className="font-medium flex items-center mb-2 text-[#E0E0E0]">
+              <div className="grid lg:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <h4 className="font-medium flex items-center text-[#E0E0E0]">
                     <Filter className="w-4 h-4 mr-2 text-[#00B4D8]" />
                     Filters
                   </h4>
-                  <div className="space-y-1 text-sm text-gray-400">
+                  <div className="space-y-1 text-sm text-gray-400 pl-6">
                     {mapping.filters.includeKeywords.length > 0 && (
                       <div>Include: {mapping.filters.includeKeywords.join(", ")}</div>
                     )}
@@ -882,14 +812,21 @@ export default function ForwardingPage() {
                     )}
                     {mapping.filters.blockUrls && <div>• Blocks URLs</div>}
                     {mapping.filters.blockForwards && <div>• Blocks forwards</div>}
+                    {!mapping.filters.includeKeywords.length && 
+                     !mapping.filters.excludeKeywords.length && 
+                     !mapping.filters.allowedMessageTypes.length && 
+                     !mapping.filters.blockUrls && 
+                     !mapping.filters.blockForwards && (
+                      <div className="text-gray-500 italic">No filters applied</div>
+                    )}
                   </div>
                 </div>
-                <div>
-                  <h4 className="font-medium flex items-center mb-2 text-[#E0E0E0]">
+                <div className="space-y-2">
+                  <h4 className="font-medium flex items-center text-[#E0E0E0]">
                     <Settings className="w-4 h-4 mr-2 text-[#00B4D8]" />
                     Editing
                   </h4>
-                  <div className="space-y-1 text-sm text-gray-400">
+                  <div className="space-y-1 text-sm text-gray-400 pl-6">
                     {mapping.editing.headerText && (
                       <div>Header: "{mapping.editing.headerText}"</div>
                     )}
@@ -900,6 +837,14 @@ export default function ForwardingPage() {
                     {mapping.editing.removeUrls && <div>• Removes URLs</div>}
                     {mapping.editing.removeHashtags && <div>• Removes hashtags</div>}
                     {mapping.editing.removeMentions && <div>• Removes mentions</div>}
+                    {!mapping.editing.headerText && 
+                     !mapping.editing.footerText && 
+                     !mapping.editing.removeSenderInfo && 
+                     !mapping.editing.removeUrls && 
+                     !mapping.editing.removeHashtags && 
+                     !mapping.editing.removeMentions && (
+                      <div className="text-gray-500 italic">No editing applied</div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -909,24 +854,26 @@ export default function ForwardingPage() {
       </div>
 
       {mappings.length === 0 && (
-        <Card className="bg-[#1A1A1A] border-[#333333] rounded-lg">
-          <CardContent className="py-12">
-            <div className="text-center space-y-4">
-              <ArrowRight className="w-12 h-12 mx-auto text-gray-600" />
-              <div>
-                <h3 className="text-lg font-medium text-[#E0E0E0]">No forwarding mappings</h3>
-                <p className="text-gray-400 mt-1">Create your first mapping to start forwarding messages</p>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Card className="bg-[#1A1A1A] border-[#333333] rounded-lg max-w-md w-full">
+            <CardContent className="py-12">
+              <div className="text-center space-y-6">
+                <ArrowRight className="w-16 h-16 mx-auto text-gray-600" />
+                <div className="space-y-2">
+                  <h3 className="text-xl font-medium text-[#E0E0E0]">Create Your First Mapping</h3>
+                  <p className="text-gray-400">Set up message forwarding between channels and groups</p>
+                </div>
+                <Button 
+                  onClick={() => setIsCreateDialogOpen(true)}
+                  className="bg-[#00B4D8] hover:bg-[#00B4D8]/80 text-white rounded-lg px-6 py-3"
+                >
+                  <Plus className="w-5 h-5 mr-2" />
+                  Create Mapping
+                </Button>
               </div>
-              <Button 
-                onClick={() => setIsCreateDialogOpen(true)}
-                className="bg-[#00B4D8] hover:bg-[#00B4D8]/80 text-white rounded-lg"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Create Your First Mapping
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
       )}
     </div>
   );
