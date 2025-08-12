@@ -1,0 +1,121 @@
+📦 Prompt: Split AutoForwardX into Separate Admin Panel & User Dashboard
+
+🧩 Objective:
+Separate the current unified dashboard into two distinct interfaces:
+
+Admin Panel: Full access to system-wide configuration, worker management, session oversight, and global logs/statistics.
+
+User Dashboard: User-facing interface for managing their own sessions, forwarding settings, destinations, filters, etc.
+
+🎯 Requirements:
+
+Routing & Access Control
+
+Create two separate root-level applications (or route prefixes):
+
+/admin → Admin Panel
+
+/dashboard or /app → User Dashboard
+
+Each should have its own layout, routing tree, and authentication flow.
+
+Admin panel must be accessible only by users with admin role (verify via token/role).
+
+Authentication
+
+Shared backend, but:
+
+On login, backend issues a token with role-based claims (e.g., admin or user).
+
+Frontend redirects based on role:
+
+Admin → /admin
+
+User → /dashboard
+
+Protect all admin routes using middleware (e.g., isAdmin=true).
+
+Admin Panel Features
+
+Overview (System Health, Total Users, RAM Usage, Uptime)
+
+Sessions (All users' sessions, search, stats, force-kill)
+
+Logs (Global logs: errors, warnings, tasks)
+
+Regex Rules (Global or user-specific editing)
+
+Workers (Add/remove, assign, restart, RAM monitor)
+
+Statistics (Live graph of forwarding rate, crashes, usage)
+
+Users (List, upgrade plan, suspend, delete)
+
+Settings (Limits, thresholds, notifications, etc.)
+
+User Dashboard Features
+
+Sources & Destinations
+
+Session Management (Add, view, delete own sessions)
+
+Forwarding Settings (Header/Footer, keyword filters)
+
+Regex Rules (User-defined only)
+
+Logs (Own activity only)
+
+Team Collaboration (if enabled)
+
+Settings (User profile, plan, bot linking, etc.)
+
+Shared Backend Adjustments
+
+Add role-based filtering to all admin routes (return 403 for non-admins).
+
+API response adjustments where needed to distinguish user/admin capabilities.
+
+Ensure each dashboard only pulls data relevant to that user’s scope.
+
+Folder Structure Suggestion
+
+/frontend
+├── admin-panel
+│ ├── routes/
+│ ├── components/
+│ ├── App.tsx
+│ └── index.html
+├── user-dashboard
+│ ├── routes/
+│ ├── components/
+│ ├── App.tsx
+│ └── index.html
+
+/backend
+├── routes/
+│ ├── admin/
+│ ├── user/
+│ └── auth/
+├── middlewares/
+│ └── checkAdmin.ts
+└── services/
+
+Future-Proofing
+
+Use environment variable toggles to enable/disable admin UI for production security.
+
+Consider hosting admin on a different subdomain (admin.autoforwardx.com).
+
+Apply rate limits or IP restrictions to admin routes.
+
+✅ Deliverables
+
+Admin panel running on /admin or separate subdomain
+
+User dashboard on /dashboard
+
+Role-based login and redirect logic implemented
+
+No overlap in UI features between admin and user
+
+API permissions hardened (no access leakage)
