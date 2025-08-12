@@ -119,7 +119,7 @@ export default function Dashboard() {
           <Link href="/sources">
             <Button 
               variant="outline" 
-              className="w-full bg-[#232323] border-[#333333] hover:border-[#00B4D8] hover:bg-[#00B4D8]/10 text-[#E0E0E0] hover:text-[#00B4D8] transition-all duration-200 rounded-lg shadow-lg"
+              className="w-full btn-secondary h-12 text-sm font-semibold"
             >
               <MessageSquare className="h-4 w-4 mr-2" />
               Sources
@@ -128,7 +128,7 @@ export default function Dashboard() {
           <Link href="/destinations">
             <Button 
               variant="outline" 
-              className="w-full bg-[#232323] border-[#333333] hover:border-[#00B4D8] hover:bg-[#00B4D8]/10 text-[#E0E0E0] hover:text-[#00B4D8] transition-all duration-200 rounded-lg shadow-lg"
+              className="w-full btn-secondary h-12 text-sm font-semibold"
             >
               <Router className="h-4 w-4 mr-2" />
               Destinations
@@ -137,7 +137,7 @@ export default function Dashboard() {
           <Link href="/forwarding">
             <Button 
               variant="outline" 
-              className="w-full bg-[#232323] border-[#333333] hover:border-[#00B4D8] hover:bg-[#00B4D8]/10 text-[#E0E0E0] hover:text-[#00B4D8] transition-all duration-200 rounded-lg shadow-lg"
+              className="w-full btn-secondary h-12 text-sm font-semibold"
             >
               <Zap className="h-4 w-4 mr-2" />
               Rules
@@ -146,7 +146,7 @@ export default function Dashboard() {
           <Link href="/logs">
             <Button 
               variant="outline" 
-              className="w-full bg-[#232323] border-[#333333] hover:border-[#00B4D8] hover:bg-[#00B4D8]/10 text-[#E0E0E0] hover:text-[#00B4D8] transition-all duration-200 rounded-lg shadow-lg"
+              className="w-full btn-secondary h-12 text-sm font-semibold"
             >
               <FileText className="h-4 w-4 mr-2" />
               Logs
@@ -156,131 +156,129 @@ export default function Dashboard() {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <Card className="bg-[#232323] border-[#333333] hover:border-[#00B4D8]/50 transition-all duration-200 shadow-lg rounded-lg">
+          <Card className="card-professional">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-              <CardTitle className="text-sm font-medium text-[#E0E0E0]">Active Sessions</CardTitle>
-              <div className="p-2 bg-[#00B4D8]/20 rounded-lg">
-                <Activity className="h-4 w-4 text-[#00B4D8]" />
+              <CardTitle className="text-sm font-semibold text-[#E0E0E0]">Active Sessions</CardTitle>
+              <div className="p-3 bg-[#00B4D8]/20 rounded-lg">
+                <Activity className="h-5 w-5 text-[#00B4D8]" />
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-[#E0E0E0] mb-1">{stats?.activeSessions || 0}</div>
-              <p className="text-xs text-gray-400">Telegram connections</p>
-              <div className="mt-3 h-2 bg-gray-600 rounded-full overflow-hidden">
-                <div className="h-full bg-[#00B4D8] rounded-full w-3/4 transition-all duration-300"></div>
+              <div className="text-3xl font-bold text-[#00B4D8] mb-2">{stats?.activeSessions || 0}</div>
+              <p className="text-sm text-gray-400 mb-4">Telegram connections</p>
+              <div className="progress-bar">
+                <div className="progress-fill healthy" style={{ width: '75%' }}></div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-[#232323] border-[#333333] hover:border-[#00B4D8]/50 transition-all duration-200 shadow-lg rounded-lg">
+          <Card className="card-professional">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-              <CardTitle className="text-sm font-medium text-[#E0E0E0]">Active Workers</CardTitle>
-              <div className="p-2 bg-[#00B4D8]/20 rounded-lg">
-                <Zap className="h-4 w-4 text-[#00B4D8]" />
+              <CardTitle className="text-sm font-semibold text-[#E0E0E0]">Active Workers</CardTitle>
+              <div className="p-3 bg-[#00B4D8]/20 rounded-lg">
+                <Zap className="h-5 w-5 text-[#00B4D8]" />
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-[#E0E0E0] mb-1">{stats?.activeWorkers || 0}</div>
-              <p className="text-xs text-gray-400">Processing messages</p>
-              <div className="mt-3 h-2 bg-gray-600 rounded-full overflow-hidden">
-                <div className="h-full bg-[#00B4D8] rounded-full w-4/5 transition-all duration-300"></div>
+              <div className="text-3xl font-bold text-[#00B4D8] mb-2">{stats?.activeWorkers || 0}</div>
+              <p className="text-sm text-gray-400 mb-4">Processing messages</p>
+              <div className="progress-bar">
+                <div className="progress-fill healthy" style={{ width: '80%' }}></div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-[#232323] border-[#333333] hover:border-[#00B4D8]/50 transition-all duration-200 shadow-lg rounded-lg">
+          <Card className="card-professional">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-              <CardTitle className="text-sm font-medium text-[#E0E0E0]">Messages Today</CardTitle>
-              <div className="p-2 bg-[#00B4D8]/20 rounded-lg">
-                <TrendingUp className="h-4 w-4 text-[#00B4D8]" />
+              <CardTitle className="text-sm font-semibold text-[#E0E0E0]">Messages Today</CardTitle>
+              <div className="p-3 bg-[#00B4D8]/20 rounded-lg">
+                <TrendingUp className="h-5 w-5 text-[#00B4D8]" />
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-[#E0E0E0] mb-1">{stats?.messagesProcessed || 0}</div>
-              <p className="text-xs text-gray-400">Successfully forwarded</p>
-              <div className="mt-3 h-2 bg-gray-600 rounded-full overflow-hidden">
-                <div className="h-full bg-[#00B4D8] rounded-full w-2/3 transition-all duration-300"></div>
+              <div className="text-3xl font-bold text-[#00B4D8] mb-2">{stats?.messagesProcessed || 0}</div>
+              <p className="text-sm text-gray-400 mb-4">Successfully forwarded</p>
+              <div className="progress-bar">
+                <div className="progress-fill healthy" style={{ width: '60%' }}></div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-[#232323] border-[#333333] hover:border-[#00B4D8]/50 transition-all duration-200 shadow-lg rounded-lg">
+          <Card className="card-professional">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-              <CardTitle className="text-sm font-medium text-[#E0E0E0]">System Status</CardTitle>
-              <div className="p-2 bg-[#00B4D8]/20 rounded-lg">
+              <CardTitle className="text-sm font-semibold text-[#E0E0E0]">System Status</CardTitle>
+              <div className="p-3 bg-[#00B4D8]/20 rounded-lg">
                 {getStatusIcon(health?.status || "healthy")}
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-[#E0E0E0] mb-1 capitalize">
+              <div className="text-2xl font-bold text-[#00B4D8] mb-2 capitalize">
                 {health?.status || "Healthy"}
               </div>
-              <p className="text-xs text-gray-400">All systems operational</p>
-              <Badge 
-                variant="outline" 
-                className="mt-2 border-[#00B4D8]/50 text-[#00B4D8] bg-[#00B4D8]/10"
-              >
+              <p className="text-sm text-gray-400 mb-4">All systems operational</p>
+              <div className={`status-indicator ${health?.status === 'healthy' ? 'status-healthy' : health?.status === 'warning' ? 'status-warning' : 'status-critical'}`}>
+                {getStatusIcon(health?.status || "healthy")}
                 Operational
-              </Badge>
+              </div>
             </CardContent>
           </Card>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* System Health */}
-          <Card className="bg-[#232323] border-[#333333] hover:border-[#00B4D8]/50 transition-all duration-200 shadow-lg rounded-lg">
+          <Card className="card-professional">
             <CardHeader>
-              <CardTitle className="flex items-center gap-3 text-xl text-[#E0E0E0]">
-                <div className="p-2 bg-[#00B4D8]/20 rounded-lg">
-                  <Database className="h-5 w-5 text-[#00B4D8]" />
+              <CardTitle className="flex items-center gap-3 text-xl font-semibold text-[#00B4D8]">
+                <div className="p-3 bg-[#00B4D8]/20 rounded-lg">
+                  <Database className="h-6 w-6 text-[#00B4D8]" />
                 </div>
                 System Health
               </CardTitle>
-              <CardDescription className="text-gray-400">
+              <CardDescription className="text-gray-400 text-base">
                 Real-time resource monitoring
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-[#E0E0E0]">CPU Usage</span>
-                  <span className={`font-mono font-medium ${getHealthColor(health?.cpuUsage || 0)}`}>
+            <CardContent className="space-y-8">
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-[#E0E0E0] font-medium">CPU Usage</span>
+                  <span className={`font-mono font-bold text-lg ${getHealthColor(health?.cpuUsage || 0)}`}>
                     {health?.cpuUsage || 0}%
                   </span>
                 </div>
-                <div className="h-3 bg-gray-600 rounded-full overflow-hidden">
+                <div className="progress-bar">
                   <div 
-                    className={`h-full ${getProgressColor(health?.cpuUsage || 0)} rounded-full transition-all duration-500`}
+                    className={`progress-fill ${(health?.cpuUsage || 0) < 50 ? 'healthy' : (health?.cpuUsage || 0) < 80 ? 'warning' : 'critical'}`}
                     style={{ width: `${health?.cpuUsage || 0}%` }}
                   ></div>
                 </div>
               </div>
               
-              <div className="space-y-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-[#E0E0E0]">Memory Usage</span>
-                  <span className={`font-mono font-medium ${getHealthColor(health?.memoryUsage || 0)}`}>
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-[#E0E0E0] font-medium">Memory Usage</span>
+                  <span className={`font-mono font-bold text-lg ${getHealthColor(health?.memoryUsage || 0)}`}>
                     {health?.memoryUsage || 0}%
                   </span>
                 </div>
-                <div className="h-3 bg-gray-600 rounded-full overflow-hidden">
+                <div className="progress-bar">
                   <div 
-                    className={`h-full ${getProgressColor(health?.memoryUsage || 0)} rounded-full transition-all duration-500`}
+                    className={`progress-fill ${(health?.memoryUsage || 0) < 50 ? 'healthy' : (health?.memoryUsage || 0) < 80 ? 'warning' : 'critical'}`}
                     style={{ width: `${health?.memoryUsage || 0}%` }}
                   ></div>
                 </div>
               </div>
               
-              <div className="space-y-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-[#E0E0E0]">Database Load</span>
-                  <span className={`font-mono font-medium ${getHealthColor(health?.dbLoad || 0)}`}>
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-[#E0E0E0] font-medium">Database Load</span>
+                  <span className={`font-mono font-bold text-lg ${getHealthColor(health?.dbLoad || 0)}`}>
                     {health?.dbLoad || 0}%
                   </span>
                 </div>
-                <div className="h-3 bg-gray-600 rounded-full overflow-hidden">
+                <div className="progress-bar">
                   <div 
-                    className={`h-full ${getProgressColor(health?.dbLoad || 0)} rounded-full transition-all duration-500`}
+                    className={`progress-fill ${(health?.dbLoad || 0) < 50 ? 'healthy' : (health?.dbLoad || 0) < 80 ? 'warning' : 'critical'}`}
                     style={{ width: `${health?.dbLoad || 0}%` }}
                   ></div>
                 </div>
@@ -289,45 +287,48 @@ export default function Dashboard() {
           </Card>
 
           {/* Recent Activity */}
-          <Card className="bg-[#232323] border-[#333333] hover:border-[#00B4D8]/50 transition-all duration-200 shadow-lg rounded-lg">
+          <Card className="card-professional">
             <CardHeader>
-              <CardTitle className="flex items-center gap-3 text-xl text-[#E0E0E0]">
-                <div className="p-2 bg-[#00B4D8]/20 rounded-lg">
-                  <Clock className="h-5 w-5 text-[#00B4D8]" />
+              <CardTitle className="flex items-center gap-3 text-xl font-semibold text-[#00B4D8]">
+                <div className="p-3 bg-[#00B4D8]/20 rounded-lg">
+                  <Clock className="h-6 w-6 text-[#00B4D8]" />
                 </div>
                 Activity Feed
               </CardTitle>
-              <CardDescription className="text-gray-400">
+              <CardDescription className="text-gray-400 text-base">
                 Latest system events and updates
               </CardDescription>
             </CardHeader>
             <CardContent>
               {activity && activity.length > 0 ? (
-                <div className="space-y-4">
-                  {activity.slice(0, 5).map((item) => (
+                <div className="space-y-3">
+                  {activity.slice(0, 5).map((item, index) => (
                     <div 
                       key={item.id} 
-                      className="flex items-start gap-4 p-4 bg-[#2a2a2a] rounded-lg border border-[#404040] hover:border-[#00B4D8]/30 transition-all duration-200"
+                      className={`activity-item fade-in-up ${item.type === 'session_started' || item.type === 'message_forwarded' ? 'success' : item.type === 'error' ? 'error' : ''}`}
+                      style={{ animationDelay: `${index * 100}ms` }}
                     >
-                      <div className="p-2 bg-[#00B4D8]/20 rounded-lg">
-                        {getActivityIcon(item.type)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[#E0E0E0] text-sm font-medium">{item.description}</p>
-                        <p className="text-xs text-gray-400 mt-1">
-                          {new Date(item.timestamp).toLocaleString()}
-                        </p>
+                      <div className="flex items-start gap-4">
+                        <div className="p-2 bg-[#00B4D8]/20 rounded-lg flex-shrink-0">
+                          {getActivityIcon(item.type)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[#E0E0E0] font-medium">{item.description}</p>
+                          <p className="text-sm text-gray-400 mt-1">
+                            {new Date(item.timestamp).toLocaleString()}
+                          </p>
+                        </div>
                       </div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-8">
-                  <div className="p-4 bg-[#2a2a2a] rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-                    <Activity className="h-8 w-8 text-gray-500" />
+                <div className="text-center py-12">
+                  <div className="p-6 bg-[#2a2a2a] rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
+                    <Activity className="h-10 w-10 text-gray-500" />
                   </div>
-                  <p className="text-[#E0E0E0] font-medium">No recent activity</p>
-                  <p className="text-xs text-gray-400 mt-1">Activity will appear here as your system operates</p>
+                  <h3 className="text-[#E0E0E0] font-semibold text-lg mb-2">No recent activity</h3>
+                  <p className="text-gray-400">Activity will appear here as your system operates</p>
                 </div>
               )}
             </CardContent>
@@ -336,20 +337,15 @@ export default function Dashboard() {
 
         {/* Session Controls Footer */}
         <div className="mt-12 flex flex-wrap gap-4 justify-center">
-          <Button 
-            className="bg-[#00B4D8] hover:bg-[#00B4D8]/80 text-white px-6 py-2 rounded-lg transition-all duration-200 shadow-lg"
-          >
+          <Button className="btn-primary">
             Add New Session
           </Button>
-          <Button 
-            variant="outline"
-            className="bg-[#232323] border-[#333333] hover:border-[#00B4D8] hover:bg-[#00B4D8]/10 text-[#E0E0E0] hover:text-[#00B4D8] px-6 py-2 rounded-lg transition-all duration-200"
-          >
+          <Button className="btn-secondary">
             Pause All Sessions
           </Button>
           <Button 
             variant="outline"
-            className="bg-[#232323] border-[#333333] hover:border-red-400 hover:bg-red-500/10 text-[#E0E0E0] hover:text-red-400 px-6 py-2 rounded-lg transition-all duration-200"
+            className="bg-transparent border-2 border-red-500 text-red-400 hover:bg-red-500 hover:text-white px-6 py-3 rounded-lg font-semibold transition-all duration-300"
           >
             Stop All Sessions
           </Button>

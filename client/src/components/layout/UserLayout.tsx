@@ -177,7 +177,7 @@ export default function UserLayout({ children }: UserLayoutProps) {
         {/* User Info */}
         {sidebarOpen && (
           <div className="p-4 border-b border-[#333333]">
-            <Card className="p-4 bg-[#232323] border-[#333333] rounded-lg shadow-lg">
+            <Card className="card-professional p-4">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 bg-[#00B4D8] rounded-full flex items-center justify-center shadow-lg">
                   <span className="text-white font-bold text-lg">
@@ -185,16 +185,13 @@ export default function UserLayout({ children }: UserLayoutProps) {
                   </span>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-[#E0E0E0] truncate">
+                  <p className="text-sm font-semibold text-[#E0E0E0] truncate">
                     {user?.username}
                   </p>
                   <div className="flex items-center gap-2 mt-1">
-                    <Badge 
-                      variant="outline" 
-                      className="text-xs border-[#00B4D8]/50 text-[#00B4D8] bg-[#00B4D8]/10"
-                    >
+                    <div className="status-indicator status-healthy text-xs">
                       {user?.userType ? (user.userType.charAt(0).toUpperCase() + user.userType.slice(1)) : 'User'}
-                    </Badge>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -208,17 +205,16 @@ export default function UserLayout({ children }: UserLayoutProps) {
             const Icon = item.icon;
             return (
               <Link key={item.name} href={item.href}>
-                <Button
-                  variant="ghost"
-                  className={`w-full justify-start gap-3 border transition-all duration-200 rounded-lg ${
+                <div
+                  className={`sidebar-link ${item.current ? 'active' : ''} ${
                     !sidebarOpen && "justify-center px-2"
-                  } ${getNavItemClasses(item.current)}`}
+                  }`}
                   title={!sidebarOpen ? item.name : undefined}
                   onClick={() => window.innerWidth < 768 && setSidebarOpen(false)}
                 >
                   <Icon className="h-5 w-5 flex-shrink-0" />
-                  {sidebarOpen && <span className="truncate font-medium">{item.name}</span>}
-                </Button>
+                  {sidebarOpen && <span className="truncate ml-3">{item.name}</span>}
+                </div>
               </Link>
             );
           })}

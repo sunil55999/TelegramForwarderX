@@ -1,0 +1,156 @@
+Prompt: Implement Professional Dark Theme for User Dashboard in AutoForwardX
+Objective:
+Update and improve the User Dashboard UI to create a sleek, professional, dark-themed interface. The design should be easy to navigate, beginner-friendly, and mobile-responsive. The goal is to have a visually appealing dashboard that maintains a clean and modern professional look with neon accents and subtle animations.
+
+Specific Requirements:
+Color Scheme & Theme:
+
+Primary Background: Use a dark gray (#121212 or #181818) for the background.
+
+Card Backgrounds: Slightly lighter dark gray (#232323) with soft drop shadows to create separation.
+
+Text Color: Use light gray (#E0E0E0) for general text. Important labels or values should be in neon blue (#00B4D8).
+
+Accent Colors: Apply muted neon (light teal, blue) accents for buttons, links, progress bars, and hover effects.
+
+Button Styles:
+
+Use rounded, flat buttons with neon blue hover effects. Buttons should glow subtly on hover and click.
+
+Example CSS for buttons:
+
+css
+Copy
+Edit
+button {
+  background-color: #00B4D8;
+  color: #FFF;
+  border: 2px solid transparent;
+  padding: 12px 20px;
+  border-radius: 25px;
+  font-size: 16px;
+  font-weight: bold;
+  transition: background-color 0.3s, box-shadow 0.3s;
+}
+
+button:hover {
+  background-color: #007C91;
+  box-shadow: 0 0 10px rgba(0, 180, 216, 0.5);
+}
+Card Layout & Stats:
+
+Create modular, flat cards with a minimalist style.
+
+Each card should display key stats: Active Sessions, Active Workers, Messages Today, and System Health.
+
+Use progress bars with neon accent colors for CPU, Memory, and Database load. Each card should have a clean layout and subtle shadow on hover for better visual separation.
+
+Side Navigation:
+
+Simplify the sidebar with icons and labels for each section: Dashboard, Sources, Destinations, Forwarding Rules, Logs, etc.
+
+Highlight the active link with a neon underline or background color.
+
+Collapsible sidebar on mobile with clear icons and minimal text.
+
+Example CSS for the sidebar:
+
+css
+Copy
+Edit
+.sidebar-link {
+  color: #BBB;
+  display: flex;
+  align-items: center;
+  padding: 12px;
+  margin-bottom: 10px;
+  border-radius: 8px;
+  transition: background-color 0.3s, color 0.3s;
+}
+
+.sidebar-link:hover, .sidebar-link.active {
+  background-color: #333;
+  color: #00B4D8;
+}
+Typography:
+
+Use modern fonts like Poppins or Roboto for readability.
+
+Headers should be bold with neon accents for important statistics or section titles.
+
+Example for headings:
+
+css
+Copy
+Edit
+h1, h2, h3 {
+  font-family: 'Poppins', sans-serif;
+  color: #FFF;
+  font-weight: bold;
+}
+
+h3 {
+  color: #00B4D8; /* Neon accent for headers */
+}
+Activity Feed & Status:
+
+Activity Feed should display recent system events (e.g., session starts, errors) with clear icons and colored backgrounds (green for success, red for errors).
+
+System Status should show as operational, healthy, or warning with a color-coded label (e.g., green for healthy, red for warning).
+
+Use subtle animations on activity feed items as they appear.
+
+Example CSS for activity items:
+
+css
+Copy
+Edit
+.activity-item.success {
+  background-color: #004C61;
+  color: #FFF;
+}
+
+.activity-item.error {
+  background-color: #D32F2F;
+  color: #FFF;
+}
+Layout & Spacing:
+
+Ensure consistent spacing around components for visual balance.
+
+Increase padding and margin around cards, buttons, and the sidebar to create clear separation between elements.
+
+Mobile Responsiveness:
+
+Ensure that the sidebar collapses or transforms into a floating menu on mobile.
+
+Content sections should stack vertically on smaller screens.
+
+Cards and buttons should resize appropriately for different screen sizes using flexbox or grid layout.
+
+Hover Effects & Animations:
+
+Apply subtle glowing effects to buttons and links on hover.
+
+Use smooth transitions for progress bars and other changing elements.
+
+Minimal animations are allowed for hover states and active elements.
+
+Deliverables:
+Updated User Dashboard UI with the new professional dark theme and minimal animations.
+
+Responsive layout that adapts well to both desktop and mobile views.
+
+Buttons with smooth hover effects and neon accents.
+
+System stats cards with progress bars and clean design.
+
+Sidebar with collapsible functionality and intuitive navigation.
+
+Activity feed and system health with clearly labeled status indicators and event logs.
+
+Additional Notes:
+The focus should be on usability while maintaining a sleek, professional aesthetic.
+
+Ensure the UI is beginner-friendly with clear labels and tooltips for key features.
+
