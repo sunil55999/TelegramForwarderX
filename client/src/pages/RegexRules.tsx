@@ -1,574 +1,778 @@
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
-import { useToast } from '@/hooks/use-toast';
-import { Plus, Edit, Trash2, TestTube, Copy, ArrowUp, ArrowDown } from 'lucide-react';
+import { useState, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import { Badge } from "@/components/ui/badge";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Plus, Trash2, ChevronDown, ChevronUp, Save, RotateCcw, Crown } from "lucide-react";
+import { useLocation } from "wouter";
 
 interface RegexRule {
   id: string;
-  name: string;
-  description?: string;
-  pattern: string;
-  replacement?: string;
-  rule_type: 'find_replace' | 'remove' | 'extract' | 'conditional_replace';
-  order_index: number;
-  case_sensitive: boolean;
-  mapping_id?: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
+  findPattern: string;
+  replaceWith: string;
+  isEnabled: boolean;
+  flags: string;
 }
 
-interface RegexRuleFormData {
-  name: string;
-  description: string;
-  pattern: string;
-  replacement: string;
-  rule_type: string;
-  case_sensitive: boolean;
-  is_active: boolean;
+interface AdvancedRules {
+  regexRules: RegexRule[];
+  blockWords: string[];
+  includeKeywords: string[];
+  excludeKeywords: string[];
+  keywordMatchMode: string;
+  caseSensitive: boolean;
+  headerText: string;
+  footerText: string;
+  removeMentions: boolean;
+  removeUrls: boolean;
+  mediaFilter: string;
+  forwardingMode: string;
+  delayEnabled: boolean;
+  delaySeconds: number;
+  autoReplyRules: Array<{pattern: string; reply: string; isEnabled: boolean}>;
+  schedulingEnabled: boolean;
+  scheduleStartTime: string;
+  scheduleEndTime: string;
+  scheduleDays: string[];
 }
 
 export default function RegexRules() {
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [isTestDialogOpen, setIsTestDialogOpen] = useState(false);
-  const [editingRule, setEditingRule] = useState<RegexRule | null>(null);
-  const [testingRule, setTestingRule] = useState<RegexRule | null>(null);
-  const [testText, setTestText] = useState('');
-  const [testResult, setTestResult] = useState<any>(null);
-  
-  const [formData, setFormData] = useState<RegexRuleFormData>({
-    name: '',
-    description: '',
-    pattern: '',
-    replacement: '',
-    rule_type: 'find_replace',
-    case_sensitive: false,
-    is_active: true
-  });
-
+  const [location] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  
+  // Get mapping ID from URL params
+  const urlParams = new URLSearchParams(location.split('?')[1] || '');
+  const mappingId = urlParams.get('mapping');
 
-  const { data: rules = [], isLoading } = useQuery({
-    queryKey: ['/api/regex-rules'],
+  // Collapsible state
+  const [regexOpen, setRegexOpen] = useState(true);
+  const [keywordOpen, setKeywordOpen] = useState(false);
+  const [contentOpen, setContentOpen] = useState(false);
+  const [mediaOpen, setMediaOpen] = useState(false);
+  const [delayOpen, setDelayOpen] = useState(false);
+  const [autoReplyOpen, setAutoReplyOpen] = useState(false);
+  const [schedulingOpen, setSchedulingOpen] = useState(false);
+
+  // Form state
+  const [rules, setRules] = useState<AdvancedRules>({
+    regexRules: [],
+    blockWords: [],
+    includeKeywords: [],
+    excludeKeywords: [],
+    keywordMatchMode: "any",
+    caseSensitive: false,
+    headerText: "",
+    footerText: "",
+    removeMentions: false,
+    removeUrls: false,
+    mediaFilter: "all",
+    forwardingMode: "copy",
+    delayEnabled: false,
+    delaySeconds: 0,
+    autoReplyRules: [],
+    schedulingEnabled: false,
+    scheduleStartTime: "",
+    scheduleEndTime: "",
+    scheduleDays: []
+  });
+
+  // Get user plan for premium features
+  const { data: userPlan } = useQuery({
+    queryKey: ['/api/user/plan'],
     queryFn: async () => {
-      const response = await fetch('/api/regex-rules', {
+      const response = await fetch('/api/user/plan', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
       });
-      if (!response.ok) throw new Error('Failed to fetch regex rules');
+      if (!response.ok) throw new Error('Failed to fetch user plan');
       return response.json();
     }
   });
 
-  const createRuleMutation = useMutation({
-    mutationFn: async (data: RegexRuleFormData) => {
-      const response = await fetch('/api/regex-rules', {
-        method: 'POST',
+  // Load existing rules if editing a specific mapping
+  const { data: existingRules, isLoading } = useQuery({
+    queryKey: ['/api/forwarding/mappings', mappingId, 'rules'],
+    queryFn: async () => {
+      const response = await fetch(`/api/forwarding/mappings/${mappingId}/rules`, {
         headers: {
-          'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify(data)
+        }
       });
-      if (!response.ok) throw new Error('Failed to create regex rule');
+      if (!response.ok) throw new Error('Failed to fetch rules');
       return response.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/regex-rules'] });
-      setIsCreateDialogOpen(false);
-      resetForm();
-      toast({ description: 'Regex rule created successfully' });
-    },
-    onError: () => {
-      toast({ variant: 'destructive', description: 'Failed to create regex rule' });
-    }
+    enabled: !!mappingId
   });
 
-  const updateRuleMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: Partial<RegexRuleFormData> }) => {
-      const response = await fetch(`/api/regex-rules/${id}`, {
+  // Update form when existing rules are loaded
+  useEffect(() => {
+    if (existingRules) {
+      setRules(existingRules);
+    }
+  }, [existingRules]);
+
+  // Save rules mutation
+  const saveRulesMutation = useMutation({
+    mutationFn: async (rulesData: AdvancedRules) => {
+      const response = await fetch(`/api/forwarding/mappings/${mappingId}/rules`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify(data)
+        body: JSON.stringify(rulesData)
       });
-      if (!response.ok) throw new Error('Failed to update regex rule');
+      if (!response.ok) throw new Error('Failed to save rules');
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/regex-rules'] });
-      setIsEditDialogOpen(false);
-      setEditingRule(null);
-      resetForm();
-      toast({ description: 'Regex rule updated successfully' });
+      toast({ description: "Advanced rules saved successfully!" });
+      queryClient.invalidateQueries({ queryKey: ['/api/forwarding/mappings'] });
     },
     onError: () => {
-      toast({ variant: 'destructive', description: 'Failed to update regex rule' });
+      toast({ variant: 'destructive', description: "Failed to save rules" });
     }
   });
 
-  const deleteRuleMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const response = await fetch(`/api/regex-rules/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+  const isPremium = userPlan?.features?.scheduling || false;
+
+  // Helper functions
+  const addRegexRule = () => {
+    setRules(prev => ({
+      ...prev,
+      regexRules: [...prev.regexRules, {
+        id: Date.now().toString(),
+        findPattern: "",
+        replaceWith: "",
+        isEnabled: true,
+        flags: "gi"
+      }]
+    }));
+  };
+
+  const updateRegexRule = (index: number, updates: Partial<RegexRule>) => {
+    setRules(prev => ({
+      ...prev,
+      regexRules: prev.regexRules.map((rule, i) => 
+        i === index ? { ...rule, ...updates } : rule
+      )
+    }));
+  };
+
+  const removeRegexRule = (index: number) => {
+    setRules(prev => ({
+      ...prev,
+      regexRules: prev.regexRules.filter((_, i) => i !== index)
+    }));
+  };
+
+  const addAutoReplyRule = () => {
+    setRules(prev => ({
+      ...prev,
+      autoReplyRules: [...prev.autoReplyRules, {
+        pattern: "",
+        reply: "",
+        isEnabled: true
+      }]
+    }));
+  };
+
+  const updateAutoReplyRule = (index: number, updates: any) => {
+    setRules(prev => ({
+      ...prev,
+      autoReplyRules: prev.autoReplyRules.map((rule, i) => 
+        i === index ? { ...rule, ...updates } : rule
+      )
+    }));
+  };
+
+  const removeAutoReplyRule = (index: number) => {
+    setRules(prev => ({
+      ...prev,
+      autoReplyRules: prev.autoReplyRules.filter((_, i) => i !== index)
+    }));
+  };
+
+  const handleSave = () => {
+    if (!mappingId) {
+      toast({ variant: 'destructive', description: "No mapping selected" });
+      return;
+    }
+    saveRulesMutation.mutate(rules);
+  };
+
+  const handleReset = () => {
+    if (existingRules) {
+      setRules(existingRules);
+    } else {
+      setRules({
+        regexRules: [],
+        blockWords: [],
+        includeKeywords: [],
+        excludeKeywords: [],
+        keywordMatchMode: "any",
+        caseSensitive: false,
+        headerText: "",
+        footerText: "",
+        removeMentions: false,
+        removeUrls: false,
+        mediaFilter: "all",
+        forwardingMode: "copy",
+        delayEnabled: false,
+        delaySeconds: 0,
+        autoReplyRules: [],
+        schedulingEnabled: false,
+        scheduleStartTime: "",
+        scheduleEndTime: "",
+        scheduleDays: []
       });
-      if (!response.ok) throw new Error('Failed to delete regex rule');
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/regex-rules'] });
-      toast({ description: 'Regex rule deleted successfully' });
-    },
-    onError: () => {
-      toast({ variant: 'destructive', description: 'Failed to delete regex rule' });
     }
-  });
-
-  const testRuleMutation = useMutation({
-    mutationFn: async ({ id, text }: { id: string; text: string }) => {
-      const response = await fetch(`/api/regex-rules/${id}/test`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({ text })
-      });
-      if (!response.ok) throw new Error('Failed to test regex rule');
-      return response.json();
-    },
-    onSuccess: (result) => {
-      setTestResult(result);
-    },
-    onError: () => {
-      toast({ variant: 'destructive', description: 'Failed to test regex rule' });
-    }
-  });
-
-  const resetForm = () => {
-    setFormData({
-      name: '',
-      description: '',
-      pattern: '',
-      replacement: '',
-      rule_type: 'find_replace',
-      case_sensitive: false,
-      is_active: true
-    });
+    toast({ description: "Rules reset to last saved state" });
   };
 
-  const handleEdit = (rule: RegexRule) => {
-    setEditingRule(rule);
-    setFormData({
-      name: rule.name,
-      description: rule.description || '',
-      pattern: rule.pattern,
-      replacement: rule.replacement || '',
-      rule_type: rule.rule_type,
-      case_sensitive: rule.case_sensitive,
-      is_active: rule.is_active
-    });
-    setIsEditDialogOpen(true);
-  };
-
-  const handleTest = (rule: RegexRule) => {
-    setTestingRule(rule);
-    setTestText('');
-    setTestResult(null);
-    setIsTestDialogOpen(true);
-  };
-
-  const runTest = () => {
-    if (testingRule && testText) {
-      testRuleMutation.mutate({ id: testingRule.id, text: testText });
-    }
-  };
-
-  const getRuleTypeColor = (type: string) => {
-    switch (type) {
-      case 'find_replace': return 'bg-blue-100 text-blue-800';
-      case 'remove': return 'bg-red-100 text-red-800';
-      case 'extract': return 'bg-green-100 text-green-800';
-      case 'conditional_replace': return 'bg-purple-100 text-purple-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
+  if (!mappingId) {
+    return (
+      <div className="p-6">
+        <Card className="bg-[#232323] border-gray-600">
+          <CardContent className="pt-6">
+            <p className="text-gray-400 text-center">
+              Please select a forwarding mapping to edit its advanced rules.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
-      <div className="container mx-auto p-6">
-        <div className="flex items-center justify-center h-64">
-          <div className="text-lg">Loading regex rules...</div>
-        </div>
+      <div className="p-6">
+        <Card className="bg-[#232323] border-gray-600">
+          <CardContent className="pt-6">
+            <p className="text-gray-400 text-center">Loading rules...</p>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto p-6">
-      <div className="flex justify-between items-center mb-6">
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Regex Editing Rules</h1>
-          <p className="text-gray-600">Manage advanced message transformation rules using regular expressions</p>
+          <h1 className="text-2xl font-bold text-white">Advanced Message Rules</h1>
+          <p className="text-gray-400 mt-1">Configure comprehensive message processing rules</p>
         </div>
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Create Rule
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Create Regex Rule</DialogTitle>
-              <DialogDescription>
-                Create a new regular expression rule to transform messages
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="name">Rule Name</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="Enter rule name"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="rule_type">Rule Type</Label>
-                  <Select
-                    value={formData.rule_type}
-                    onValueChange={(value) => setFormData({ ...formData, rule_type: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="find_replace">Find & Replace</SelectItem>
-                      <SelectItem value="remove">Remove</SelectItem>
-                      <SelectItem value="extract">Extract</SelectItem>
-                      <SelectItem value="conditional_replace">Conditional Replace</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div>
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Describe what this rule does"
-                  rows={2}
-                />
-              </div>
-              <div>
-                <Label htmlFor="pattern">Regex Pattern</Label>
-                <Input
-                  id="pattern"
-                  value={formData.pattern}
-                  onChange={(e) => setFormData({ ...formData, pattern: e.target.value })}
-                  placeholder="Enter regex pattern (e.g., \b\w+@\w+\.\w+\b)"
-                  className="font-mono"
-                />
-              </div>
-              {(formData.rule_type === 'find_replace' || formData.rule_type === 'conditional_replace') && (
-                <div>
-                  <Label htmlFor="replacement">Replacement Text</Label>
-                  <Input
-                    id="replacement"
-                    value={formData.replacement}
-                    onChange={(e) => setFormData({ ...formData, replacement: e.target.value })}
-                    placeholder="Enter replacement text"
-                  />
-                </div>
-              )}
-              <div className="flex items-center space-x-4">
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="case_sensitive"
-                    checked={formData.case_sensitive}
-                    onCheckedChange={(checked) => setFormData({ ...formData, case_sensitive: checked })}
-                  />
-                  <Label htmlFor="case_sensitive">Case Sensitive</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="is_active"
-                    checked={formData.is_active}
-                    onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
-                  />
-                  <Label htmlFor="is_active">Active</Label>
-                </div>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={() => createRuleMutation.mutate(formData)} disabled={createRuleMutation.isPending}>
-                {createRuleMutation.isPending ? 'Creating...' : 'Create Rule'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <div className="flex gap-3">
+          <Button
+            variant="outline"
+            onClick={handleReset}
+            className="border-gray-600 text-gray-300 hover:bg-gray-700"
+          >
+            <RotateCcw className="w-4 h-4 mr-2" />
+            Reset
+          </Button>
+          <Button
+            onClick={handleSave}
+            disabled={saveRulesMutation.isPending}
+            className="bg-[#00B4D8] hover:bg-[#0090BB] text-white"
+          >
+            <Save className="w-4 h-4 mr-2" />
+            {saveRulesMutation.isPending ? 'Saving...' : 'Apply Rules'}
+          </Button>
+        </div>
       </div>
 
-      <div className="grid gap-4">
-        {rules.map((rule: RegexRule) => (
-          <Card key={rule.id} className={!rule.is_active ? 'opacity-60' : ''}>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <CardTitle className="text-lg">{rule.name}</CardTitle>
-                  <Badge className={getRuleTypeColor(rule.rule_type)}>
-                    {rule.rule_type.replace('_', ' ')}
-                  </Badge>
-                  {!rule.is_active && <Badge variant="secondary">Inactive</Badge>}
+      <div className="space-y-4">
+        {/* Regex Find/Replace */}
+        <Card className="bg-[#232323] border-gray-600">
+          <Collapsible open={regexOpen} onOpenChange={setRegexOpen}>
+            <CollapsibleTrigger asChild>
+              <CardHeader className="cursor-pointer hover:bg-[#2A2A2A] transition-colors">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-[#00B4D8] flex items-center gap-2">
+                    Regex Find & Replace
+                    <Badge variant="secondary" className="text-xs">
+                      {rules.regexRules.length} rules
+                    </Badge>
+                  </CardTitle>
+                  {regexOpen ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
                 </div>
-                <div className="flex items-center space-x-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleTest(rule)}
-                  >
-                    <TestTube className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleEdit(rule)}
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => deleteRuleMutation.mutate(rule.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-              {rule.description && (
-                <CardDescription>{rule.description}</CardDescription>
-              )}
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div>
-                  <span className="text-sm font-medium text-gray-500">Pattern:</span>
-                  <code className="ml-2 px-2 py-1 bg-gray-100 rounded text-sm font-mono">
-                    {rule.pattern}
-                  </code>
-                </div>
-                {rule.replacement && (
-                  <div>
-                    <span className="text-sm font-medium text-gray-500">Replacement:</span>
-                    <code className="ml-2 px-2 py-1 bg-gray-100 rounded text-sm">
-                      {rule.replacement}
-                    </code>
-                  </div>
-                )}
-                <div className="flex items-center space-x-4 text-sm text-gray-500">
-                  <span>Order: {rule.order_index}</span>
-                  <span>Case Sensitive: {rule.case_sensitive ? 'Yes' : 'No'}</span>
-                  <span>Created: {new Date(rule.created_at).toLocaleDateString()}</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-
-        {rules.length === 0 && (
-          <Card>
-            <CardContent className="text-center py-12">
-              <p className="text-gray-500 mb-4">No regex rules created yet</p>
-              <Button onClick={() => setIsCreateDialogOpen(true)}>
-                <Plus className="mr-2 h-4 w-4" />
-                Create Your First Rule
-              </Button>
-            </CardContent>
-          </Card>
-        )}
-      </div>
-
-      {/* Edit Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Edit Regex Rule</DialogTitle>
-            <DialogDescription>
-              Update the regex rule configuration
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="edit-name">Rule Name</Label>
-                <Input
-                  id="edit-name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label htmlFor="edit-rule_type">Rule Type</Label>
-                <Select
-                  value={formData.rule_type}
-                  onValueChange={(value) => setFormData({ ...formData, rule_type: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="find_replace">Find & Replace</SelectItem>
-                    <SelectItem value="remove">Remove</SelectItem>
-                    <SelectItem value="extract">Extract</SelectItem>
-                    <SelectItem value="conditional_replace">Conditional Replace</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div>
-              <Label htmlFor="edit-description">Description</Label>
-              <Textarea
-                id="edit-description"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                rows={2}
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-pattern">Regex Pattern</Label>
-              <Input
-                id="edit-pattern"
-                value={formData.pattern}
-                onChange={(e) => setFormData({ ...formData, pattern: e.target.value })}
-                className="font-mono"
-              />
-            </div>
-            {(formData.rule_type === 'find_replace' || formData.rule_type === 'conditional_replace') && (
-              <div>
-                <Label htmlFor="edit-replacement">Replacement Text</Label>
-                <Input
-                  id="edit-replacement"
-                  value={formData.replacement}
-                  onChange={(e) => setFormData({ ...formData, replacement: e.target.value })}
-                />
-              </div>
-            )}
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="edit-case_sensitive"
-                  checked={formData.case_sensitive}
-                  onCheckedChange={(checked) => setFormData({ ...formData, case_sensitive: checked })}
-                />
-                <Label htmlFor="edit-case_sensitive">Case Sensitive</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="edit-is_active"
-                  checked={formData.is_active}
-                  onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
-                />
-                <Label htmlFor="edit-is_active">Active</Label>
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={() => editingRule && updateRuleMutation.mutate({ id: editingRule.id, data: formData })}
-              disabled={updateRuleMutation.isPending}
-            >
-              {updateRuleMutation.isPending ? 'Updating...' : 'Update Rule'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Test Dialog */}
-      <Dialog open={isTestDialogOpen} onOpenChange={setIsTestDialogOpen}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>Test Regex Rule</DialogTitle>
-            <DialogDescription>
-              Test how your regex rule transforms sample text
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div>
-              <Label htmlFor="test-text">Sample Text</Label>
-              <Textarea
-                id="test-text"
-                value={testText}
-                onChange={(e) => setTestText(e.target.value)}
-                placeholder="Enter sample text to test the regex rule"
-                rows={4}
-              />
-            </div>
-            {testResult && (
-              <div className="space-y-4">
-                <div>
-                  <Label>Original Text</Label>
-                  <div className="p-3 bg-gray-50 rounded border">
-                    <pre className="whitespace-pre-wrap text-sm">{testResult.original}</pre>
-                  </div>
-                </div>
-                <div>
-                  <Label>Transformed Text</Label>
-                  <div className="p-3 bg-green-50 rounded border">
-                    <pre className="whitespace-pre-wrap text-sm">{testResult.transformed}</pre>
-                  </div>
-                </div>
-                {testResult.matches && testResult.matches.length > 0 && (
-                  <div>
-                    <Label>Matches Found</Label>
-                    <div className="p-3 bg-blue-50 rounded border">
-                      <div className="flex flex-wrap gap-2">
-                        {testResult.matches.map((match: string, index: number) => (
-                          <Badge key={index} variant="secondary">{match}</Badge>
-                        ))}
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent className="space-y-4">
+                {rules.regexRules.map((rule, index) => (
+                  <div key={rule.id} className="p-4 border border-gray-600 rounded-lg space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Switch
+                        checked={rule.isEnabled}
+                        onCheckedChange={(checked) => updateRegexRule(index, { isEnabled: checked })}
+                      />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeRegexRule(index)}
+                        className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-gray-300">Find Pattern</Label>
+                        <Input
+                          value={rule.findPattern}
+                          onChange={(e) => updateRegexRule(index, { findPattern: e.target.value })}
+                          placeholder="Enter regex pattern..."
+                          className="bg-[#1A1A1A] border-gray-600 text-white mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-gray-300">Replace With</Label>
+                        <Input
+                          value={rule.replaceWith}
+                          onChange={(e) => updateRegexRule(index, { replaceWith: e.target.value })}
+                          placeholder="Replacement text..."
+                          className="bg-[#1A1A1A] border-gray-600 text-white mt-1"
+                        />
                       </div>
                     </div>
+                    <div>
+                      <Label className="text-gray-300">Flags</Label>
+                      <Select value={rule.flags} onValueChange={(value) => updateRegexRule(index, { flags: value })}>
+                        <SelectTrigger className="bg-[#1A1A1A] border-gray-600 text-white mt-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-[#1A1A1A] border-gray-600">
+                          <SelectItem value="gi">gi (Global, Case-insensitive)</SelectItem>
+                          <SelectItem value="g">g (Global)</SelectItem>
+                          <SelectItem value="i">i (Case-insensitive)</SelectItem>
+                          <SelectItem value="">None</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                ))}
+                <Button
+                  onClick={addRegexRule}
+                  variant="outline"
+                  className="w-full border-gray-600 text-gray-300 hover:bg-gray-700"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Regex Rule
+                </Button>
+              </CardContent>
+            </CollapsibleContent>
+          </Collapsible>
+        </Card>
+
+        {/* Keyword Filtering */}
+        <Card className="bg-[#232323] border-gray-600">
+          <Collapsible open={keywordOpen} onOpenChange={setKeywordOpen}>
+            <CollapsibleTrigger asChild>
+              <CardHeader className="cursor-pointer hover:bg-[#2A2A2A] transition-colors">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-[#00B4D8]">Keyword Filtering</CardTitle>
+                  {keywordOpen ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+                </div>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-gray-300">Include Keywords</Label>
+                    <Textarea
+                      value={rules.includeKeywords.join('\n')}
+                      onChange={(e) => setRules(prev => ({ ...prev, includeKeywords: e.target.value.split('\n').filter(k => k.trim()) }))}
+                      placeholder="One keyword per line..."
+                      className="bg-[#1A1A1A] border-gray-600 text-white mt-1 min-h-[100px]"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-gray-300">Exclude Keywords</Label>
+                    <Textarea
+                      value={rules.excludeKeywords.join('\n')}
+                      onChange={(e) => setRules(prev => ({ ...prev, excludeKeywords: e.target.value.split('\n').filter(k => k.trim()) }))}
+                      placeholder="One keyword per line..."
+                      className="bg-[#1A1A1A] border-gray-600 text-white mt-1 min-h-[100px]"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-gray-300">Block Words</Label>
+                  <Textarea
+                    value={rules.blockWords.join('\n')}
+                    onChange={(e) => setRules(prev => ({ ...prev, blockWords: e.target.value.split('\n').filter(k => k.trim()) }))}
+                    placeholder="Words that block messages (one per line)..."
+                    className="bg-[#1A1A1A] border-gray-600 text-white mt-1"
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="text-gray-300">Keyword Match Mode</Label>
+                    <Select value={rules.keywordMatchMode} onValueChange={(value) => setRules(prev => ({ ...prev, keywordMatchMode: value }))}>
+                      <SelectTrigger className="bg-[#1A1A1A] border-gray-600 text-white mt-1 w-[200px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-[#1A1A1A] border-gray-600">
+                        <SelectItem value="any">Match Any Keyword</SelectItem>
+                        <SelectItem value="all">Match All Keywords</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      checked={rules.caseSensitive}
+                      onCheckedChange={(checked) => setRules(prev => ({ ...prev, caseSensitive: checked }))}
+                    />
+                    <Label className="text-gray-300">Case Sensitive</Label>
+                  </div>
+                </div>
+              </CardContent>
+            </CollapsibleContent>
+          </Collapsible>
+        </Card>
+
+        {/* Content Modification */}
+        <Card className="bg-[#232323] border-gray-600">
+          <Collapsible open={contentOpen} onOpenChange={setContentOpen}>
+            <CollapsibleTrigger asChild>
+              <CardHeader className="cursor-pointer hover:bg-[#2A2A2A] transition-colors">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-[#00B4D8]">Content Modification</CardTitle>
+                  {contentOpen ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+                </div>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-gray-300">Header Text</Label>
+                    <Textarea
+                      value={rules.headerText}
+                      onChange={(e) => setRules(prev => ({ ...prev, headerText: e.target.value }))}
+                      placeholder="Text to add at the beginning..."
+                      className="bg-[#1A1A1A] border-gray-600 text-white mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-gray-300">Footer Text</Label>
+                    <Textarea
+                      value={rules.footerText}
+                      onChange={(e) => setRules(prev => ({ ...prev, footerText: e.target.value }))}
+                      placeholder="Text to add at the end..."
+                      className="bg-[#1A1A1A] border-gray-600 text-white mt-1"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      checked={rules.removeMentions}
+                      onCheckedChange={(checked) => setRules(prev => ({ ...prev, removeMentions: checked }))}
+                    />
+                    <Label className="text-gray-300">Remove @mentions</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      checked={rules.removeUrls}
+                      onCheckedChange={(checked) => setRules(prev => ({ ...prev, removeUrls: checked }))}
+                    />
+                    <Label className="text-gray-300">Remove URLs</Label>
+                  </div>
+                </div>
+              </CardContent>
+            </CollapsibleContent>
+          </Collapsible>
+        </Card>
+
+        {/* Media & Mode Settings */}
+        <Card className="bg-[#232323] border-gray-600">
+          <Collapsible open={mediaOpen} onOpenChange={setMediaOpen}>
+            <CollapsibleTrigger asChild>
+              <CardHeader className="cursor-pointer hover:bg-[#2A2A2A] transition-colors">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-[#00B4D8]">Media & Forwarding Mode</CardTitle>
+                  {mediaOpen ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+                </div>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-gray-300">Media Filter</Label>
+                    <Select value={rules.mediaFilter} onValueChange={(value) => setRules(prev => ({ ...prev, mediaFilter: value }))}>
+                      <SelectTrigger className="bg-[#1A1A1A] border-gray-600 text-white mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-[#1A1A1A] border-gray-600">
+                        <SelectItem value="all">All Messages</SelectItem>
+                        <SelectItem value="text-only">Text Only</SelectItem>
+                        <SelectItem value="media-only">Media Only</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-gray-300">Forwarding Mode</Label>
+                    <Select value={rules.forwardingMode} onValueChange={(value) => setRules(prev => ({ ...prev, forwardingMode: value }))}>
+                      <SelectTrigger className="bg-[#1A1A1A] border-gray-600 text-white mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-[#1A1A1A] border-gray-600">
+                        <SelectItem value="copy">Copy Messages</SelectItem>
+                        <SelectItem value="keep-sender">Keep Original Sender</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </CardContent>
+            </CollapsibleContent>
+          </Collapsible>
+        </Card>
+
+        {/* Message Delay */}
+        <Card className="bg-[#232323] border-gray-600">
+          <Collapsible open={delayOpen} onOpenChange={setDelayOpen}>
+            <CollapsibleTrigger asChild>
+              <CardHeader className="cursor-pointer hover:bg-[#2A2A2A] transition-colors">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-[#00B4D8]">Message Delay</CardTitle>
+                  {delayOpen ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+                </div>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent className="space-y-4">
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    checked={rules.delayEnabled}
+                    onCheckedChange={(checked) => setRules(prev => ({ ...prev, delayEnabled: checked }))}
+                  />
+                  <Label className="text-gray-300">Enable Message Delay</Label>
+                </div>
+                {rules.delayEnabled && (
+                  <div>
+                    <Label className="text-gray-300">Delay (seconds)</Label>
+                    <Input
+                      type="number"
+                      value={rules.delaySeconds}
+                      onChange={(e) => setRules(prev => ({ ...prev, delaySeconds: parseInt(e.target.value) || 0 }))}
+                      min="0"
+                      max="3600"
+                      className="bg-[#1A1A1A] border-gray-600 text-white mt-1 w-[200px]"
+                    />
                   </div>
                 )}
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsTestDialogOpen(false)}>
-              Close
-            </Button>
-            <Button onClick={runTest} disabled={!testText || testRuleMutation.isPending}>
-              {testRuleMutation.isPending ? 'Testing...' : 'Run Test'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              </CardContent>
+            </CollapsibleContent>
+          </Collapsible>
+        </Card>
+
+        {/* Auto-Reply (Premium) */}
+        <Card className="bg-[#232323] border-gray-600">
+          <Collapsible open={autoReplyOpen} onOpenChange={setAutoReplyOpen}>
+            <CollapsibleTrigger asChild>
+              <CardHeader className="cursor-pointer hover:bg-[#2A2A2A] transition-colors">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <CardTitle className="text-[#00B4D8]">Auto-Reply Patterns</CardTitle>
+                    {!isPremium && <Crown className="w-4 h-4 text-yellow-500" />}
+                    <Badge variant="secondary" className="text-xs">
+                      {rules.autoReplyRules.length} patterns
+                    </Badge>
+                  </div>
+                  {autoReplyOpen ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+                </div>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent className="space-y-4">
+                {!isPremium && (
+                  <div className="p-4 bg-yellow-900/20 border border-yellow-600 rounded-lg">
+                    <p className="text-yellow-300 text-sm">
+                      <Crown className="w-4 h-4 inline mr-1" />
+                      Auto-Reply is a Premium feature. Upgrade to access this functionality.
+                    </p>
+                  </div>
+                )}
+                <div className={!isPremium ? "opacity-50 pointer-events-none" : ""}>
+                  {rules.autoReplyRules.map((rule, index) => (
+                    <div key={index} className="p-4 border border-gray-600 rounded-lg space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Switch
+                          checked={rule.isEnabled}
+                          onCheckedChange={(checked) => updateAutoReplyRule(index, { isEnabled: checked })}
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeAutoReplyRule(index)}
+                          className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-gray-300">Trigger Pattern</Label>
+                          <Input
+                            value={rule.pattern}
+                            onChange={(e) => updateAutoReplyRule(index, { pattern: e.target.value })}
+                            placeholder="Keyword or phrase to trigger..."
+                            className="bg-[#1A1A1A] border-gray-600 text-white mt-1"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-gray-300">Auto Reply</Label>
+                          <Input
+                            value={rule.reply}
+                            onChange={(e) => updateAutoReplyRule(index, { reply: e.target.value })}
+                            placeholder="Response message..."
+                            className="bg-[#1A1A1A] border-gray-600 text-white mt-1"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  <Button
+                    onClick={addAutoReplyRule}
+                    variant="outline"
+                    className="w-full border-gray-600 text-gray-300 hover:bg-gray-700"
+                    disabled={!isPremium}
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Auto-Reply Pattern
+                  </Button>
+                </div>
+              </CardContent>
+            </CollapsibleContent>
+          </Collapsible>
+        </Card>
+
+        {/* Scheduling (Premium) */}
+        <Card className="bg-[#232323] border-gray-600">
+          <Collapsible open={schedulingOpen} onOpenChange={setSchedulingOpen}>
+            <CollapsibleTrigger asChild>
+              <CardHeader className="cursor-pointer hover:bg-[#2A2A2A] transition-colors">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <CardTitle className="text-[#00B4D8]">Scheduling</CardTitle>
+                    {!isPremium && <Crown className="w-4 h-4 text-yellow-500" />}
+                  </div>
+                  {schedulingOpen ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+                </div>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent className="space-y-4">
+                {!isPremium && (
+                  <div className="p-4 bg-yellow-900/20 border border-yellow-600 rounded-lg">
+                    <p className="text-yellow-300 text-sm">
+                      <Crown className="w-4 h-4 inline mr-1" />
+                      Scheduling is a Premium feature. Upgrade to access this functionality.
+                    </p>
+                  </div>
+                )}
+                <div className={!isPremium ? "opacity-50 pointer-events-none" : ""}>
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      checked={rules.schedulingEnabled}
+                      onCheckedChange={(checked) => setRules(prev => ({ ...prev, schedulingEnabled: checked }))}
+                      disabled={!isPremium}
+                    />
+                    <Label className="text-gray-300">Enable Scheduling</Label>
+                  </div>
+                  {rules.schedulingEnabled && (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-gray-300">Start Time</Label>
+                          <Input
+                            type="time"
+                            value={rules.scheduleStartTime}
+                            onChange={(e) => setRules(prev => ({ ...prev, scheduleStartTime: e.target.value }))}
+                            className="bg-[#1A1A1A] border-gray-600 text-white mt-1"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-gray-300">End Time</Label>
+                          <Input
+                            type="time"
+                            value={rules.scheduleEndTime}
+                            onChange={(e) => setRules(prev => ({ ...prev, scheduleEndTime: e.target.value }))}
+                            className="bg-[#1A1A1A] border-gray-600 text-white mt-1"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-gray-300">Active Days</Label>
+                        <div className="grid grid-cols-7 gap-2 mt-1">
+                          {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
+                            <Button
+                              key={day}
+                              variant={rules.scheduleDays.includes(day) ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => {
+                                setRules(prev => ({
+                                  ...prev,
+                                  scheduleDays: prev.scheduleDays.includes(day)
+                                    ? prev.scheduleDays.filter(d => d !== day)
+                                    : [...prev.scheduleDays, day]
+                                }));
+                              }}
+                              className={rules.scheduleDays.includes(day) 
+                                ? "bg-[#00B4D8] hover:bg-[#0090BB] text-white" 
+                                : "border-gray-600 text-gray-300 hover:bg-gray-700"
+                              }
+                            >
+                              {day}
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </CollapsibleContent>
+          </Collapsible>
+        </Card>
+      </div>
+
+      {/* Sticky footer with action buttons */}
+      <div className="sticky bottom-0 bg-[#1A1A1A] border-t border-gray-600 p-4 -m-6 mt-6">
+        <div className="flex justify-end gap-3">
+          <Button
+            variant="outline"
+            onClick={handleReset}
+            className="border-gray-600 text-gray-300 hover:bg-gray-700"
+          >
+            <RotateCcw className="w-4 h-4 mr-2" />
+            Reset
+          </Button>
+          <Button
+            onClick={handleSave}
+            disabled={saveRulesMutation.isPending}
+            className="bg-[#00B4D8] hover:bg-[#0090BB] text-white"
+          >
+            <Save className="w-4 h-4 mr-2" />
+            {saveRulesMutation.isPending ? 'Saving...' : 'Apply Rules'}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

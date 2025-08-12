@@ -122,6 +122,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // User plan endpoint
+  app.get("/api/user/plan", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const user = req.user;
+      
+      // Return plan information based on user type
+      const planType = user.userType || "free";
+      
+      return res.json({
+        type: planType,
+        features: {
+          scheduling: planType === "premium" || planType === "elite" || planType === "admin",
+          advancedRegex: planType === "premium" || planType === "elite" || planType === "admin",
+          autoReply: planType === "premium" || planType === "elite" || planType === "admin",
+        }
+      });
+    } catch (error) {
+      console.error("Error fetching user plan:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // Sessions endpoints - Require authentication, admin gets all sessions  
   app.get("/api/sessions", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
