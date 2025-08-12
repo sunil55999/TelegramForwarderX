@@ -1,0 +1,46 @@
+Objective:
+Update the AutoForwardX dashboard to include a "Quick Pair Setup" section for creating Source–Destination pairs on one screen without going through multiple popups.
+
+Design Requirements:
+
+Keep the dark theme, typography, and card style exactly the same as the current dashboard.
+
+Insert a new Quick Pair Setup card directly below the "Welcome back, admin!" header and above the "System Health" & "Activity Feed" cards.
+
+Inside the Quick Pair Setup card, include:
+
+Dropdown: Select Source Channel (list fetched from existing sources API, with an inline "Add New" option that opens the existing Add Source modal).
+
+Dropdown: Select Destination Channel (list fetched from existing destinations API, with an inline "Add New" option that opens the existing Add Destination modal).
+
+Dropdown: Pair Type (Channel → Channel, Channel → Group, Group → Channel, Group → Group).
+
+Numeric input: Priority (1–10).
+
+Toggle: Advanced Settings (expands inline to show filters and editing options, reusing existing backend logic).
+
+Primary action button: Create Pair (calls the same backend endpoint as the current "Create Mapping" flow).
+
+Keep form fields inline and compact to avoid taking too much vertical space.
+
+Show success/error toast notifications using the existing notification system after creating a pair.
+
+Add a Pairs Overview table below the form showing existing mappings (Source, Destination, Type, Status, Actions). The Actions should have Edit & Delete buttons that reuse existing modals & API endpoints.
+
+Backend Requirements:
+
+Reuse existing backend endpoints for adding sources, adding destinations, and creating mappings.
+
+API calls should be triggered on "Create Pair" without requiring page reload.
+
+Ensure form dropdowns dynamically fetch available sources/destinations from the backend on page load.
+
+Keep backend validation & error handling intact.
+
+Style:
+
+Same colors, padding, font sizes, and rounded corners as the current UI.
+
+Use subtle glowing blue accents for buttons and highlights to match the dashboard’s theme.
+
+No new CSS frameworks — reuse existing styles to avoid design inconsistencies.
